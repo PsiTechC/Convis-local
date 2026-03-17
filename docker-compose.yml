@@ -1,0 +1,285 @@
+version: '3.8'
+
+services:
+  # Redis for campaign system (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: convis-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - convis-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ngrok tunnel for webhooks
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: convis-ngrok
+    restart: unless-stopped
+    command:
+      - "http"
+      - "api:8000"
+    ports:
+      - "4040:4040"  # Ngrok web interface
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    networks:
+      - convis-network
+    depends_on:
+      - api
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./convis-api
+      dockerfile: Dockerfile
+    container_name: convis-api
+    restart: unless-stopped
+    ports:
+      - "8010:8000"
+    environment:
+      # MongoDB Configuration
+      - MONGODB_URI=${MONGODB_URI}
+      - DATABASE_NAME=${DATABASE_NAME}
+
+      # Security
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+
+      # Email Configuration
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      # SMTP settings use defaults from settings.py if not provided
+      # - SMTP_HOST=${SMTP_HOST}
+      # - SMTP_PORT=${SMTP_PORT}
+      # - SMTP_USE_SSL=${SMTP_USE_SSL}
+
+      # URLs
+      - FRONTEND_URL=${FRONTEND_URL}
+      - API_BASE_URL=${API_BASE_URL}
+      - BASE_URL=${BASE_URL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+
+      # Redis
+      - REDIS_URL=redis://redis:6379
+
+      # Twilio
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # Google Calendar
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+
+      # Microsoft Calendar
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID}
+      - MICROSOFT_REDIRECT_URI=${MICROSOFT_REDIRECT_URI}
+
+      # Campaign Settings
+      - DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      - DEFAULT_MAX_ATTEMPTS=${DEFAULT_MAX_ATTEMPTS:-3}
+      - DEFAULT_RETRY_DELAYS=${DEFAULT_RETRY_DELAYS:-15,60,1440}
+
+      # Feature Flags
+      - ENABLE_CALENDAR_BOOKING=${ENABLE_CALENDAR_BOOKING:-true}
+      - ENABLE_POST_CALL_AI=${ENABLE_POST_CALL_AI:-true}
+      - ENABLE_AUTO_RETRY=${ENABLE_AUTO_RETRY:-true}
+      - CAMPAIGN_DISPATCH_INTERVAL_SECONDS=${CAMPAIGN_DISPATCH_INTERVAL_SECONDS:-1}
+
+      # Celery
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+      # n8n Integration
+      - N8N_API_URL=http://n8n:5678
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - N8N_API_KEY=${N8N_API_KEY:-}
+      - N8N_ENABLED=${N8N_ENABLED:-true}
+
+      - ENVIRONMENT=production
+      - PORT=8000
+      - HOST=0.0.0.0
+    volumes:
+      - api-uploads:/app/uploads
+      - api-chroma:/app/chroma_db
+      - api-logs:/app/logs
+      - torch-hub-cache:/root/.cache/torch/hub  # Cache for Silero VAD model
+    networks:
+      - convis-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Next.js Frontend
+  web:
+    build:
+      context: ./convis-web
+      dockerfile: Dockerfile
+    container_name: convis-web
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NODE_ENV=production
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - convis-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: convis-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Basic Configuration
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+
+      # Authentication
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-convis123}
+
+      # Security & Embedding
+      - N8N_SECURE_COOKIE=false
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+
+      # Database (PostgreSQL)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${N8N_DB_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:-n8n_password}
+
+      # Execution Settings
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - GENERIC_TIMEZONE=${DEFAULT_TIMEZONE:-Asia/Kolkata}
+
+      # Disable telemetry
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - convis-network
+    depends_on:
+      n8n-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # PostgreSQL for n8n
+  n8n-db:
+    image: postgres:15-alpine
+    container_name: convis-n8n-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${N8N_DB_USER:-n8n}
+      - POSTGRES_PASSWORD=${N8N_DB_PASSWORD:-n8n_password}
+      - POSTGRES_DB=n8n
+    volumes:
+      - n8n-postgres:/var/lib/postgresql/data
+    networks:
+      - convis-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${N8N_DB_USER:-n8n} -d n8n"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: convis-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot-etc:/etc/nginx/ssl:ro
+      - certbot-www:/var/www/certbot:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - api
+      - web
+    networks:
+      - convis-network
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: convis-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+# Persistent volumes for data
+volumes:
+  redis-data:
+    driver: local
+  api-uploads:
+    driver: local
+  api-chroma:
+    driver: local
+  api-logs:
+    driver: local
+  torch-hub-cache:
+    driver: local  # Cache Silero VAD model (~2MB) to avoid re-download on restart
+  nginx-logs:
+    driver: local
+  certbot-etc:
+    driver: local
+  certbot-www:
+    driver: local
+  n8n-data:
+    driver: local
+  n8n-postgres:
+    driver: local
+
+# Network for inter-container communication
+networks:
+  convis-network:
+    driver: bridge

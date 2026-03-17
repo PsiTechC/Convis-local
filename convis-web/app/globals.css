@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Brand Colors */
+  --primary: #2563EB;
+  --accent: #10B981;
+  --neutral-dark: #0F172A;
+  --neutral-mid: #64748B;
+  --neutral-light: #F8FAFC;
+
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-neutral-dark: var(--neutral-dark);
+  --color-neutral-mid: var(--neutral-mid);
+  --color-neutral-light: var(--neutral-light);
+  --font-sans: 'Inter', var(--font-geist-sans);
+  --font-heading: 'Sora', var(--font-geist-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

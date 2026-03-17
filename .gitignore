@@ -1,0 +1,98 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+chroma_db/
+
+# Uploads
+uploads/
+temp/
+tmp/
+
+# Docker
+# (keep .dockerignore tracked)
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Backup files
+*.bak
+*.backup
+*~
+*.env.backup
+
+# Audio files (generated/temporary)
+*.wav
+*.mp3
+*.ogg
+
+# Test files in root
+test_*.py
+
+# Documentation build artifacts
+_build/
+site/
+bolna-master
+.env

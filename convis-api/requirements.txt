@@ -1,0 +1,84 @@
+fastapi>=0.115.2
+uvicorn>=0.31.1
+gunicorn>=21.2.0
+pymongo==4.5.0
+dnspython>=2.4.0
+python-dotenv>=1.1.0
+bcrypt==4.1.1
+pydantic>=2.11.0
+pydantic-settings>=2.5.2
+python-multipart>=0.0.18
+email-validator==2.3.0
+anyio>=4.7.0
+PyJWT==2.8.0
+streamlit>=1.29.0
+requests>=2.31.0
+websockets>=12.0
+twilio>=8.10.0
+teler>=0.2.0
+# Document processing
+PyPDF2>=3.0.0
+openpyxl>=3.1.0
+python-docx>=1.1.0
+# Enhanced PDF processing with OCR support
+pymupdf>=1.23.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+# Vector embeddings and search
+openai>=1.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+# Vector database for fast similarity search (uses OpenAI embeddings API)
+chromadb>=0.4.0
+
+# Database connectors for RAG integration
+psycopg2-binary>=2.9.9  # PostgreSQL
+mysql-connector-python>=8.2.0  # MySQL
+
+# Campaign System Dependencies
+redis>=5.0.1
+redis[asyncio]>=5.0.1  # Async Redis for high concurrency
+phonenumbers>=8.13.27
+pytz>=2024.1
+httpx>=0.26.0
+motor>=3.3.2
+python-dateutil>=2.8.2
+aiosmtplib>=3.0.0
+
+# Rate Limiting
+slowapi>=0.1.9
+
+# Calendar Integration
+google-auth>=2.27.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.116.0
+msal>=1.26.0
+
+# Background Tasks (optional - use Celery for production)
+celery>=5.3.6
+
+# Testing
+pytest>=7.4.4
+pytest-asyncio>=0.23.3
+fastembed>=0.2.0
+soundfile>=0.12.1
+scipy>=1.11.0
+aiohttp>=3.9.0
+# audioop-lts>=0.2.1  # Only needed for Python 3.13+ (Python 3.11 has audioop built-in)
+
+# PyTorch for Silero VAD - installed separately in Dockerfile with CPU-only wheels
+# DO NOT add torch here - it's installed via: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# This keeps image size ~200MB instead of ~2GB
+
+slowapi
+
+# Silero VAD for voice activity detection (custom provider pipeline)
+# Requires: torch, onnxruntime, numpy
+silero-vad>=5.1
+onnxruntime>=1.16.0
+
+# Offline ASR - faster-whisper (CTranslate2-based Whisper, fastest CPU inference)
+faster-whisper>=1.0.0
+
+# Offline TTS - Piper (ONNX-based, fast CPU inference, no internet required)
+piper-tts>=1.2.0
