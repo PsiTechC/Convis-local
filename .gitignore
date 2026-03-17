@@ -13,7 +13,7 @@ build/
 venv/
 env/
 ENV/
-.venv
+.venv/
 
 # IDE
 .vscode/
@@ -22,19 +22,27 @@ ENV/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Logs
 *.log
 logs/
 *.log.*
+downloaded-logs-*.json
 
-# Environment variables
+# Environment variables / Secrets
 .env
 .env.local
 .env.*.local
 .env.production
 .env.development
+*.env
+!.env.production.example
+
+# Keys / Certificates
+*.pem
+*.key
+*.crt
+*.p12
 
 # Node
 node_modules/
@@ -51,7 +59,6 @@ next-env.d.ts
 # Build outputs
 dist/
 build/
-*.egg-info/
 
 # Database
 *.db
@@ -63,9 +70,6 @@ chroma_db/
 uploads/
 temp/
 tmp/
-
-# Docker
-# (keep .dockerignore tracked)
 
 # OS
 .DS_Store
@@ -80,7 +84,6 @@ htmlcov/
 # Backup files
 *.bak
 *.backup
-*~
 *.env.backup
 
 # Audio files (generated/temporary)
@@ -88,11 +91,7 @@ htmlcov/
 *.mp3
 *.ogg
 
-# Test files in root
-test_*.py
-
 # Documentation build artifacts
 _build/
 site/
 bolna-master
-.env
