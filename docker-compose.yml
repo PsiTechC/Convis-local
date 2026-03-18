@@ -1,6 +1,27 @@
 version: '3.8'
 
 services:
+  # MongoDB
+  mongo:
+    image: mongo:7
+    container_name: convis-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=psitech
+      - MONGO_INITDB_ROOT_PASSWORD=KajuPista$25
+      - MONGO_INITDB_DATABASE=convis_python
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - convis-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Redis for campaign system (optional but recommended)
   redis:
     image: redis:7-alpine
@@ -43,7 +64,7 @@ services:
     container_name: convis-api
     restart: unless-stopped
     ports:
-      - "8010:8000"
+      - "8000:8000"
     environment:
       # MongoDB Configuration
       - MONGODB_URI=${MONGODB_URI}
@@ -125,6 +146,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -137,10 +160,12 @@ services:
     build:
       context: ./convis-web
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: convis-web
     restart: unless-stopped
     ports:
-      - "3010:3000"
+      - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
@@ -258,6 +283,8 @@ services:
 
 # Persistent volumes for data
 volumes:
+  mongo-data:
+    driver: local
   redis-data:
     driver: local
   api-uploads:

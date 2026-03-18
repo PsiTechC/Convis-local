@@ -3,10 +3,26 @@
 
 export const ENHANCED_TTS_VOICES = {
   piper: [
+    // American Female
     { value: 'en_US-lessac-medium', label: 'Lessac - American Female', gender: 'female', accent: 'American' },
-    { value: 'en_US-lessac-high', label: 'Lessac - American Female (HQ)', gender: 'female', accent: 'American' },
+    { value: 'en_US-lessac-high', label: 'Lessac HQ - American Female (High Quality)', gender: 'female', accent: 'American' },
     { value: 'en_US-amy-medium', label: 'Amy - American Female', gender: 'female', accent: 'American' },
+    { value: 'en_US-kathleen-low', label: 'Kathleen - American Female', gender: 'female', accent: 'American' },
+    { value: 'en_US-arctic-medium', label: 'Arctic - American Neutral', gender: 'neutral', accent: 'American' },
+    // American Male
+    { value: 'en_US-ryan-medium', label: 'Ryan - American Male', gender: 'male', accent: 'American' },
+    { value: 'en_US-ryan-high', label: 'Ryan HQ - American Male (High Quality)', gender: 'male', accent: 'American' },
+    { value: 'en_US-joe-medium', label: 'Joe - American Male', gender: 'male', accent: 'American' },
+    { value: 'en_US-danny-low', label: 'Danny - American Male', gender: 'male', accent: 'American' },
+    { value: 'en_US-kusal-medium', label: 'Kusal - American Male (Emotive)', gender: 'male', accent: 'American' },
+    // British
     { value: 'en_GB-alba-medium', label: 'Alba - British Female', gender: 'female', accent: 'British' },
+    { value: 'en_GB-jenny-dioco-medium', label: 'Jenny - British Female', gender: 'female', accent: 'British' },
+    { value: 'en_GB-alan-medium', label: 'Alan - British Male', gender: 'male', accent: 'British' },
+    // Australian
+    { value: 'en_AU-natasha-medium', label: 'Natasha - Australian Female', gender: 'female', accent: 'Australian' },
+    { value: 'en_AU-sam-medium', label: 'Sam - Australian Male', gender: 'male', accent: 'Australian' },
+    // Indian
     { value: 'hi_IN-priyamvada-medium', label: 'Priyamvada - Hindi Female', gender: 'female', accent: 'Indian' },
     { value: 'hi_IN-pratham-medium', label: 'Pratham - Hindi Male', gender: 'male', accent: 'Indian' },
   ],
