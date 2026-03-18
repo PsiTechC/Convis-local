@@ -5,6 +5,8 @@ import asyncio
 import httpx
 from fastapi import APIRouter, HTTPException, status, Response
 from typing import Optional, List
+import io
+import wave
 from bson import ObjectId
 from datetime import datetime
 import logging
@@ -20,6 +22,7 @@ from app.models.voice import (
 from app.config.database import Database
 from app.utils.encryption import encryption_service
 from app.config.settings import settings
+from app.services.call_handlers.offline_tts_handler import OfflinePiperTTS
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -613,6 +616,220 @@ VOICE_CATALOG: List[VoiceMetadata] = [
     ),
 ]
 
+# Piper-only catalog used by Voice Lab and demo APIs.
+ACTIVE_VOICE_CATALOG: List[VoiceMetadata] = [
+    # American Female
+    VoiceMetadata(
+        id="en_US-lessac-medium",
+        name="Lessac",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="American female voice optimized for voice agents - stable and natural",
+        age_group="middle-aged",
+        use_case="Voice Agent",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-lessac-high",
+        name="Lessac HQ",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="High-quality American female voice for premium voice agent experiences",
+        age_group="middle-aged",
+        use_case="Voice Agent",
+        model="high"
+    ),
+    VoiceMetadata(
+        id="en_US-amy-medium",
+        name="Amy",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Friendly American female voice for warm conversational experiences",
+        age_group="young",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-kathleen-low",
+        name="Kathleen",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Clear American female voice suitable for customer support and IVR",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="low"
+    ),
+    VoiceMetadata(
+        id="en_US-arctic-medium",
+        name="Arctic",
+        provider="piper",
+        gender="neutral",
+        accent="American",
+        language="en",
+        description="Neutral American voice with balanced tone for professional use",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    # American Male
+    VoiceMetadata(
+        id="en_US-ryan-medium",
+        name="Ryan",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="American male voice with a clear, professional tone for voice agents",
+        age_group="young",
+        use_case="Voice Agent",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-ryan-high",
+        name="Ryan HQ",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="High-quality American male voice for premium agent deployments",
+        age_group="young",
+        use_case="Voice Agent",
+        model="high"
+    ),
+    VoiceMetadata(
+        id="en_US-joe-medium",
+        name="Joe",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Casual American male voice great for conversational AI applications",
+        age_group="middle-aged",
+        use_case="Conversational",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-danny-low",
+        name="Danny",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Warm American male voice for customer-facing support scenarios",
+        age_group="young",
+        use_case="Customer Support",
+        model="low"
+    ),
+    VoiceMetadata(
+        id="en_US-kusal-medium",
+        name="Kusal",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Expressive American male voice with emotive characteristics",
+        age_group="young",
+        use_case="Emotive Character",
+        model="medium"
+    ),
+    # British Female
+    VoiceMetadata(
+        id="en_GB-alba-medium",
+        name="Alba",
+        provider="piper",
+        gender="female",
+        accent="British",
+        language="en",
+        description="Polished British female voice for professional conversational experiences",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_GB-jenny-dioco-medium",
+        name="Jenny",
+        provider="piper",
+        gender="female",
+        accent="British",
+        language="en",
+        description="Warm British female voice ideal for customer service and IVR",
+        age_group="young",
+        use_case="Customer Support",
+        model="medium"
+    ),
+    # British Male
+    VoiceMetadata(
+        id="en_GB-alan-medium",
+        name="Alan",
+        provider="piper",
+        gender="male",
+        accent="British",
+        language="en",
+        description="Authoritative British male voice for professional voice agents",
+        age_group="middle-aged",
+        use_case="Voice Agent",
+        model="medium"
+    ),
+    # Australian
+    VoiceMetadata(
+        id="en_AU-natasha-medium",
+        name="Natasha",
+        provider="piper",
+        gender="female",
+        accent="Australian",
+        language="en",
+        description="Australian female voice with a friendly and approachable tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_AU-sam-medium",
+        name="Sam",
+        provider="piper",
+        gender="male",
+        accent="Australian",
+        language="en",
+        description="Australian male voice with a relaxed and clear conversational style",
+        age_group="young",
+        use_case="Conversational",
+        model="medium"
+    ),
+    # Indian
+    VoiceMetadata(
+        id="hi_IN-priyamvada-medium",
+        name="Priyamvada",
+        provider="piper",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Hindi female voice tuned for natural local playback",
+        age_group="young",
+        use_case="Conversational",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="hi_IN-pratham-medium",
+        name="Pratham",
+        provider="piper",
+        gender="male",
+        accent="Indian",
+        language="hi",
+        description="Hindi male voice tuned for natural local playback",
+        age_group="young",
+        use_case="Conversational",
+        model="medium"
+    ),
+]
+
 
 async def fetch_elevenlabs_voices(api_key: str) -> List[VoiceMetadata]:
     """Fetch all voices from ElevenLabs API including user's custom voices"""
@@ -764,30 +981,30 @@ async def get_all_voices(
     include_custom: bool = False
 ):
     """
-    Get all available voices from all TTS providers with optional filtering
+    Get all available Piper voices with optional filtering
 
     Query Parameters:
-    - provider: Filter by TTS provider (cartesia, elevenlabs, openai, sarvam)
+    - provider: Filter by TTS provider (currently piper)
     - gender: Filter by gender (male, female, neutral)
     - accent: Filter by accent (American, British, Indian, Australian)
     - language: Filter by language code (en, hi, etc.)
     - user_id: User ID (required if include_custom=True)
-    - include_custom: If True, also fetch custom voices from ElevenLabs account
+    - include_custom: Reserved for backward compatibility
 
     Returns:
-    - List of all available voices with complete metadata
+    - List of available Piper voices with complete metadata
     """
     try:
-        filtered_voices = VOICE_CATALOG.copy()
+        filtered_voices = ACTIVE_VOICE_CATALOG.copy()
 
-        # If user wants to include custom ElevenLabs voices
-        if include_custom and user_id and (provider is None or provider.lower() == "elevenlabs"):
+        # Legacy ElevenLabs sync is disabled in Piper-only mode.
+        if include_custom and user_id and provider and provider.lower() == "elevenlabs":
             try:
                 db = Database.get_db()
                 api_keys_collection = db['api_keys']
                 user_obj_id = ObjectId(user_id)
 
-                # Find ElevenLabs API key
+                # Legacy code path retained for backward compatibility.
                 api_key_doc = api_keys_collection.find_one({
                     "user_id": user_obj_id,
                     "provider": "custom",
@@ -887,7 +1104,7 @@ async def get_user_voice_preferences(user_id: str):
         for saved_voice in saved_voices:
             # Find the voice in catalog
             voice_metadata = next(
-                (v for v in VOICE_CATALOG if v.id == saved_voice["voice_id"] and v.provider == saved_voice["provider"]),
+                (v for v in ACTIVE_VOICE_CATALOG if v.id == saved_voice["voice_id"] and v.provider == saved_voice["provider"]),
                 None
             )
 
@@ -1267,12 +1484,33 @@ async def generate_openai_demo(voice_id: str, model: str, text: str, api_key: st
         )
 
 
+async def generate_piper_demo(voice_id: str, text: str) -> bytes:
+    """Generate a Piper demo and return WAV bytes for browser playback."""
+    piper_tts = OfflinePiperTTS(voice=voice_id, for_browser=True)
+    pcm_24k = await piper_tts.synthesize(text)
+    if not pcm_24k:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to synthesize Piper audio"
+        )
+
+    wav_buffer = io.BytesIO()
+    with wave.open(wav_buffer, 'wb') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(24000)
+        wav_file.writeframes(pcm_24k)
+
+    return wav_buffer.getvalue()
+
+
 # Provider API key name mapping
 PROVIDER_KEY_MAPPING = {
     "openai": "openai",
     "cartesia": "custom",  # Cartesia keys stored as custom
     "elevenlabs": "custom",  # ElevenLabs keys stored as custom
-    "sarvam": "custom"  # Sarvam keys stored as custom
+    "sarvam": "custom",  # Sarvam keys stored as custom
+    "piper": "local"
 }
 
 
@@ -1281,7 +1519,7 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
     """
     Generate voice demo for any TTS provider
 
-    Supports: OpenAI, Cartesia, ElevenLabs, Sarvam AI
+    Supports: OpenAI, Cartesia, ElevenLabs, Sarvam AI, Piper
 
     Args:
     - request: Voice demo request with provider, voice_id, and text
@@ -1306,13 +1544,24 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
 
         # Try to find voice in catalog for metadata (model info)
         voice_metadata = next(
-            (v for v in VOICE_CATALOG if v.id == request.voice_id and v.provider == request.provider),
+            (v for v in ACTIVE_VOICE_CATALOG if v.id == request.voice_id and v.provider == request.provider),
             None
         )
 
         # For ElevenLabs, voices can be dynamically synced from user's account
         # So we don't require them to be in the catalog - just use the voice_id directly
         # The TTS API will return an error if the voice doesn't exist
+
+        # Piper is local and does not require provider API keys.
+        if request.provider == "piper":
+            audio_content = await generate_piper_demo(request.voice_id, request.text)
+            return Response(
+                content=audio_content,
+                media_type="audio/wav",
+                headers={
+                    "Content-Disposition": f'inline; filename="voice_demo_{request.provider}_{request.voice_id}.wav"'
+                }
+            )
 
         # Determine which API key provider to look for
         provider_key_type = PROVIDER_KEY_MAPPING.get(request.provider, "custom")
@@ -1405,7 +1654,8 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             "openai": "tts-1",
             "cartesia": "sonic-english",
             "elevenlabs": "eleven_turbo_v2_5",
-            "sarvam": "bulbul:v2"
+            "sarvam": "bulbul:v2",
+            "piper": "medium"
         }
 
         # Determine model to use (request model > voice metadata model > default)

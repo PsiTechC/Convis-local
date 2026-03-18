@@ -241,8 +241,8 @@ const LANGUAGE_OPTIONS = [
   { value: 'tr', label: 'Turkish (Türkçe)', flag: '🇹🇷' },
 ];
 
-// ElevenLabs voices - mapped from provider-config.ts
-const VOICE_OPTIONS: VoiceOption[] = ENHANCED_TTS_VOICES.elevenlabs.map(v => ({
+// Piper voices - mapped from provider-config.ts
+const VOICE_OPTIONS: VoiceOption[] = ENHANCED_TTS_VOICES.piper.map(v => ({
   value: v.value,
   label: v.label.split(' - ')[0], // Just the name
   gender: v.gender === 'female' ? 'Female' : v.gender === 'male' ? 'Male' : 'Neutral',
@@ -290,7 +290,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Handle customer inquiries, provide support, and resolve issues professionally',
     icon: '💬',
     system_message: 'You are a professional and friendly customer support agent. Your goal is to help customers resolve their issues efficiently while maintaining a positive and empathetic tone. Always listen carefully to their concerns, provide clear solutions, and ensure customer satisfaction.',
-    voice: 'EXAVITQu4vr4xnSDxMaL',
+    voice: 'en_US-lessac-medium',
     temperature: 0.7,
     color: 'from-blue-500 to-blue-600',
   },
@@ -300,7 +300,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Engage prospects, answer questions, and drive sales conversations',
     icon: '💼',
     system_message: 'You are a knowledgeable and persuasive sales assistant. Your role is to understand customer needs, present product benefits effectively, handle objections professionally, and guide prospects through the sales process. Be consultative, not pushy.',
-    voice: 'FGY2WhTYpPnrIDTdsKH5',
+    voice: 'en_US-lessac-medium',
     temperature: 0.7,
     color: 'from-green-500 to-green-600',
   },
@@ -310,7 +310,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Book appointments, manage calendars, and send reminders',
     icon: '📅',
     system_message: 'You are an efficient appointment scheduling assistant. Help users book, reschedule, and manage appointments. Check availability, confirm details, send reminders, and ensure smooth scheduling. Be organized and detail-oriented.',
-    voice: 'cgSgspJ2msm6clMCkdW9',
+    voice: 'en_US-lessac-medium',
     temperature: 0.5,
     color: 'from-purple-500 to-purple-600',
   },
@@ -320,7 +320,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Qualify leads by asking relevant questions and gathering information',
     icon: '🎯',
     system_message: 'You are a lead qualification specialist. Ask targeted questions to understand prospect needs, budget, timeline, and decision-making process. Gather essential information to determine if the lead is qualified. Be professional and conversational.',
-    voice: 'CwhRBWXzGAHq8TQ4Fs17',
+    voice: 'en_US-lessac-medium',
     temperature: 0.6,
     color: 'from-orange-500 to-orange-600',
   },
@@ -330,7 +330,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Greet callers, route calls, and provide basic information',
     icon: '📞',
     system_message: 'You are a professional virtual receptionist. Greet callers warmly, understand their needs, provide information about the company, and route calls appropriately. Handle inquiries efficiently while maintaining a friendly demeanor.',
-    voice: 'TX3LPaxmHKxFdv7VOQHJ',
+    voice: 'en_US-lessac-medium',
     temperature: 0.6,
     color: 'from-pink-500 to-pink-600',
   },
@@ -340,7 +340,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Gather customer feedback and conduct satisfaction surveys',
     icon: '⭐',
     system_message: 'You are a feedback collection specialist. Conduct surveys, gather customer opinions, and collect testimonials. Ask thoughtful questions, encourage honest feedback, and make the process enjoyable. Be appreciative and non-intrusive.',
-    voice: 'Xb7hH8MSUJpSbSDYk0k2',
+    voice: 'en_US-lessac-medium',
     temperature: 0.7,
     color: 'from-yellow-500 to-yellow-600',
   },
@@ -392,7 +392,7 @@ export default function AIAgentPage() {
   const [formData, setFormData] = useState({
     name: '',
     system_message: '',
-    voice: 'EXAVITQu4vr4xnSDxMaL',
+    voice: 'en_US-lessac-medium',
     voice_mode: 'custom' as 'realtime' | 'custom',
     temperature: 0.7,
     api_key_id: '',
@@ -401,11 +401,11 @@ export default function AIAgentPage() {
     calendar_account_ids: [] as string[],
     calendar_enabled: false,
     asr_provider: 'deepgram',
-    tts_provider: 'elevenlabs',
+    tts_provider: 'piper',
     asr_model: 'nova-2',
     asr_language: 'en',
-    tts_voice: 'EXAVITQu4vr4xnSDxMaL',
-    tts_model: 'eleven_flash_v2_5',
+    tts_voice: 'en_US-lessac-medium',
+    tts_model: 'medium',
     tts_speed: 1.0,
     audio_buffer_size: 200,
     llm_provider: 'openai',
@@ -824,9 +824,9 @@ export default function AIAgentPage() {
             asr_provider: 'deepgram',
             asr_model: 'nova-2',
             asr_language: 'en',
-            tts_provider: 'elevenlabs',
-            tts_model: 'eleven_flash_v2_5',
-            tts_voice: formData.voice,  // voice IS the ElevenLabs voice ID
+            tts_provider: 'piper',
+            tts_model: 'medium',
+            tts_voice: formData.voice,  // voice IS the Piper voice ID
             llm_provider: 'openai',
             llm_model: 'gpt-4-turbo',
             llm_max_tokens: 150,
@@ -900,9 +900,9 @@ export default function AIAgentPage() {
             asr_provider: 'deepgram',
             asr_model: 'nova-2',
             asr_language: 'en',
-            tts_provider: 'elevenlabs',
-            tts_model: 'eleven_flash_v2_5',
-            tts_voice: formData.voice,  // voice IS the ElevenLabs voice ID
+            tts_provider: 'piper',
+            tts_model: 'medium',
+            tts_voice: formData.voice,  // voice IS the Piper voice ID
             llm_provider: 'openai',
             llm_model: 'gpt-4-turbo',
             llm_max_tokens: 150,
@@ -971,7 +971,7 @@ export default function AIAgentPage() {
       setFormData({
         name: '',
         system_message: '',
-        voice: 'EXAVITQu4vr4xnSDxMaL',
+        voice: 'en_US-lessac-medium',
         voice_mode: 'custom',
         temperature: 0.7,
         api_key_id: '',
@@ -980,11 +980,11 @@ export default function AIAgentPage() {
         calendar_account_ids: [] as string[],
         calendar_enabled: false,
         asr_provider: 'deepgram',
-        tts_provider: 'elevenlabs',
+        tts_provider: 'piper',
         asr_model: 'nova-2',
         asr_language: 'en',
-        tts_voice: 'EXAVITQu4vr4xnSDxMaL',
-        tts_model: 'eleven_flash_v2_5',
+        tts_voice: 'en_US-lessac-medium',
+        tts_model: 'medium',
         tts_speed: 1.0,
         audio_buffer_size: 200,
         llm_provider: 'openai',
@@ -1431,7 +1431,7 @@ export default function AIAgentPage() {
     setFormData({
       name: '',
       system_message: '',
-      voice: 'EXAVITQu4vr4xnSDxMaL',
+      voice: 'en_US-lessac-medium',
       voice_mode: 'custom',
       temperature: 0.7,
       api_key_id: '',
@@ -1440,11 +1440,11 @@ export default function AIAgentPage() {
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
       asr_provider: 'deepgram',
-      tts_provider: 'elevenlabs',
+      tts_provider: 'piper',
       asr_model: 'nova-2',
       asr_language: 'en',
-      tts_voice: 'EXAVITQu4vr4xnSDxMaL',
-      tts_model: 'eleven_flash_v2_5',
+      tts_voice: 'en_US-lessac-medium',
+      tts_model: 'medium',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
@@ -1469,7 +1469,7 @@ export default function AIAgentPage() {
 
   const openEditModal = async (assistant: AIAssistant) => {
     const asr = assistant.asr_provider || 'deepgram';
-    const tts = assistant.tts_provider || 'elevenlabs';
+    const tts = assistant.tts_provider || 'piper';
     const llmProvider = assistant.llm_provider || 'openai';
     const llmModel =
       assistant.llm_model ||
@@ -1479,7 +1479,7 @@ export default function AIAgentPage() {
     // Set default models/voices based on provider
     const defaultAsrModel = ASR_MODELS[asr as keyof typeof ASR_MODELS]?.[0]?.value || 'nova-2';
     const defaultTtsVoice = TTS_VOICES[tts as keyof typeof TTS_VOICES]?.[0]?.value || assistant.voice;
-    const defaultTtsModel = TTS_MODELS[tts as keyof typeof TTS_MODELS]?.[0]?.value || 'eleven_flash_v2_5';
+    const defaultTtsModel = TTS_MODELS[tts as keyof typeof TTS_MODELS]?.[0]?.value || 'medium';
     const asrModel = assistant.asr_model || defaultAsrModel;
     const asrLanguage = assistant.asr_language || 'en';
     const ttsVoice = assistant.tts_voice || defaultTtsVoice;
@@ -1495,7 +1495,7 @@ export default function AIAgentPage() {
     setFormData({
       name: assistant.name,
       system_message: assistant.system_message,
-      voice: ttsVoice,  // Use the actual ElevenLabs voice ID
+      voice: ttsVoice,  // Use the actual Piper voice ID
       voice_mode: 'custom',
       temperature: assistant.temperature,
       api_key_id: assistant.api_key_id || '',
@@ -1582,11 +1582,11 @@ export default function AIAgentPage() {
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
       asr_provider: 'deepgram',
-      tts_provider: 'elevenlabs',
+      tts_provider: 'piper',
       asr_model: 'nova-2',
       asr_language: 'en',
       tts_voice: template.voice,
-      tts_model: 'eleven_flash_v2_5',
+      tts_model: 'medium',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
@@ -1614,7 +1614,7 @@ export default function AIAgentPage() {
     setFormData({
       name: '',
       system_message: '',
-      voice: 'EXAVITQu4vr4xnSDxMaL',
+      voice: 'en_US-lessac-medium',
       voice_mode: 'custom',
       temperature: 0.7,
       api_key_id: '',
@@ -1623,11 +1623,11 @@ export default function AIAgentPage() {
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
       asr_provider: 'deepgram',
-      tts_provider: 'elevenlabs',
+      tts_provider: 'piper',
       asr_model: 'nova-2',
       asr_language: 'en',
-      tts_voice: 'EXAVITQu4vr4xnSDxMaL',
-      tts_model: 'eleven_flash_v2_5',
+      tts_voice: 'en_US-lessac-medium',
+      tts_model: 'medium',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
@@ -2461,13 +2461,13 @@ export default function AIAgentPage() {
                   ))}
                 </div>
               </div>
-              {/* Voice Selection - ElevenLabs only */}
+              {/* Voice Selection - Piper only */}
               <div>
                 <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-3`}>
                   Voice
                 </label>
                 <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mb-3`}>
-                  Select the ElevenLabs voice for your AI assistant.
+                  Select the Piper voice for your AI assistant.
                 </p>
                 {/* Gender filter */}
                 <div className="flex gap-2 mb-3">

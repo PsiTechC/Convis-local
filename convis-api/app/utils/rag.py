@@ -7,12 +7,15 @@ from typing import List, Dict, Any
 from PyPDF2 import PdfReader
 from docx import Document
 import openpyxl
-from openai import OpenAI
+import httpx
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
 
 logger = logging.getLogger(__name__)
+
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/").removesuffix("/v1")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 
 def extract_text_from_pdf(file_path: str) -> str:
@@ -102,13 +105,12 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[st
         end = start + chunk_size
         chunk = text[start:end]
 
-        # Try to end at a sentence boundary
         if end < text_length:
             last_period = chunk.rfind('.')
             last_newline = chunk.rfind('\n')
             boundary = max(last_period, last_newline)
 
-            if boundary > chunk_size // 2:  # Only use boundary if it's not too early
+            if boundary > chunk_size // 2:
                 end = start + boundary + 1
                 chunk = text[start:end]
 
@@ -118,60 +120,45 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[st
     return chunks
 
 
-def create_embeddings(texts: List[str], api_key: str) -> List[List[float]]:
-    """Create embeddings for text chunks using OpenAI"""
+async def create_embeddings(texts: List[str], api_key: str = None) -> List[List[float]]:
+    """Create embeddings for text chunks using Ollama"""
+    embeddings = []
     try:
-        client = OpenAI(api_key=api_key)
-        embeddings = []
-
-        # Process in batches to avoid rate limits
-        batch_size = 100
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=batch
-            )
-            batch_embeddings = [item.embedding for item in response.data]
-            embeddings.extend(batch_embeddings)
-
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            for text in texts:
+                response = await client.post(
+                    f"{OLLAMA_BASE_URL}/api/embeddings",
+                    json={"model": OLLAMA_EMBED_MODEL, "prompt": text}
+                )
+                response.raise_for_status()
+                embeddings.append(response.json()["embedding"])
         return embeddings
     except Exception as e:
-        logger.error(f"Error creating embeddings: {e}")
+        logger.error(f"Error creating embeddings via Ollama: {e}")
         return []
 
 
-def search_knowledge_base(
+async def search_knowledge_base(
     query: str,
     knowledge_base: List[Dict[str, Any]],
-    api_key: str,
+    api_key: str = None,
     top_k: int = 3
 ) -> List[Dict[str, Any]]:
     """
-    Search knowledge base for relevant chunks
-
-    Args:
-        query: User's question
-        knowledge_base: List of dicts with 'text' and 'embedding' keys
-        api_key: OpenAI API key for creating query embedding
-        top_k: Number of top results to return
-
-    Returns:
-        List of relevant text chunks with similarity scores
+    Search knowledge base for relevant chunks using Ollama embeddings
     """
     try:
         if not knowledge_base:
             return []
 
-        # Create embedding for the query
-        client = OpenAI(api_key=api_key)
-        query_response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=[query]
-        )
-        query_embedding = query_response.data[0].embedding
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/embeddings",
+                json={"model": OLLAMA_EMBED_MODEL, "prompt": query}
+            )
+            response.raise_for_status()
+            query_embedding = response.json()["embedding"]
 
-        # Calculate cosine similarity with all chunks
         results = []
         for item in knowledge_base:
             if 'embedding' not in item or 'text' not in item:
@@ -188,7 +175,6 @@ def search_knowledge_base(
                 'filename': item.get('filename', 'unknown')
             })
 
-        # Sort by similarity and return top k
         results.sort(key=lambda x: x['similarity'], reverse=True)
         return results[:top_k]
 
@@ -210,37 +196,30 @@ def build_knowledge_base_context(search_results: List[Dict[str, Any]]) -> str:
     return "\n".join(context_parts)
 
 
-def process_document_for_knowledge_base(
+async def process_document_for_knowledge_base(
     file_path: str,
     filename: str,
     file_type: str,
-    api_key: str
+    api_key: str = None
 ) -> Dict[str, Any]:
     """
-    Process a document and prepare it for knowledge base
-
-    Returns:
-        Dict with processed chunks and embeddings
+    Process a document and prepare it for knowledge base using Ollama embeddings
     """
     try:
-        # Extract text
         text = extract_text_from_file(file_path, file_type)
         if not text:
             raise ValueError("Could not extract text from file")
 
-        # Split into chunks
         chunks = chunk_text(text)
         if not chunks:
             raise ValueError("No chunks created from text")
 
         logger.info(f"Created {len(chunks)} chunks from {filename}")
 
-        # Create embeddings
-        embeddings = create_embeddings(chunks, api_key)
+        embeddings = await create_embeddings(chunks)
         if not embeddings:
             raise ValueError("Failed to create embeddings")
 
-        # Prepare knowledge base entries
         kb_entries = []
         for chunk, embedding in zip(chunks, embeddings):
             kb_entries.append({

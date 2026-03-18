@@ -22,7 +22,7 @@ type StoredUser = {
 interface Voice {
   id: string;
   name: string;
-  provider: 'cartesia' | 'elevenlabs' | 'openai' | 'sarvam';
+  provider: 'piper';
   gender: 'male' | 'female' | 'neutral';
   accent: string;
   language: string;
@@ -65,18 +65,12 @@ export default function VoiceLabPage() {
   const [selectedAccent, setSelectedAccent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showOnlySaved, setShowOnlySaved] = useState(false);
-  const [isSyncingVoices, setIsSyncingVoices] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
   // Audio ref
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Provider colors matching your design system
   const providerColors: Record<string, { bg: string; text: string; border: string }> = {
-    cartesia: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-300 dark:border-purple-700' },
-    elevenlabs: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-300 dark:border-blue-700' },
-    openai: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-300 dark:border-green-700' },
-    sarvam: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700' },
+    piper: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-300', border: 'border-cyan-300 dark:border-cyan-700' },
   };
 
   // Gender icons
@@ -147,10 +141,9 @@ export default function VoiceLabPage() {
       if (filters?.accent && filters.accent !== 'all') {
         params.append('accent', filters.accent);
       }
-      // Include user_id and include_custom to fetch ElevenLabs voices from user's account
+      // Keep user_id for server-side personalization if needed.
       if (currentUserId) {
         params.append('user_id', currentUserId);
-        params.append('include_custom', 'true');
       }
 
       const response = await fetch(
@@ -315,11 +308,9 @@ export default function VoiceLabPage() {
           errorMessage = response.statusText || errorMessage;
         }
 
-        // Provide clearer guidance based on provider/key issues
-        if (voice.provider === 'openai' && errorMessage.toLowerCase().includes('no openai api key')) {
-          errorMessage = 'Please add an OpenAI TTS API key in Settings (Custom Provider) or add OPENAI_API_KEY to .env.';
-        } else if (voice.provider === 'cartesia' && response.status >= 500) {
-          errorMessage = 'Cartesia demo failed (500). Please verify your Cartesia API key in Settings (.env fallback) and try again.';
+        // Piper does not require external provider API keys.
+        if (voice.provider === 'piper' && response.status >= 500) {
+          errorMessage = 'Piper demo failed. Please verify Piper models are available on the server and try again.';
         }
 
         throw new Error(errorMessage);
@@ -348,54 +339,6 @@ export default function VoiceLabPage() {
       console.error('Error playing voice:', err);
       setCurrentlyPlaying(null);
       alert(err instanceof Error ? err.message : 'Failed to play voice demo. Please try again.');
-    }
-  };
-
-  const handleSyncElevenLabsVoices = async () => {
-    if (!userId) return;
-
-    try {
-      setIsSyncingVoices(true);
-      setSyncMessage(null);
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.convis.ai'}/api/voices/elevenlabs/sync?user_id=${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to sync voices');
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSyncMessage({
-          type: 'success',
-          text: `Successfully synced ${data.total} voices from ElevenLabs`
-        });
-        // Refresh the voices list to show the synced voices
-        await fetchVoices({
-          provider: selectedProvider !== 'all' ? selectedProvider : undefined,
-          gender: selectedGender !== 'all' ? selectedGender : undefined,
-          accent: selectedAccent !== 'all' ? selectedAccent : undefined,
-        });
-      }
-    } catch (err) {
-      console.error('Error syncing ElevenLabs voices:', err);
-      setSyncMessage({
-        type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to sync voices. Please check your ElevenLabs API key in Settings.'
-      });
-    } finally {
-      setIsSyncingVoices(false);
-      // Clear message after 5 seconds
-      setTimeout(() => setSyncMessage(null), 5000);
     }
   };
 
@@ -602,58 +545,10 @@ export default function VoiceLabPage() {
                 Voice Lab
               </h1>
               <p className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>
-                Explore and test voices from all TTS providers. Find the perfect voice for your AI agents.
+                Explore and test Piper voices for your AI agents.
               </p>
             </div>
-            <button
-              onClick={handleSyncElevenLabsVoices}
-              disabled={isSyncingVoices}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
-                isSyncingVoices
-                  ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md'
-              } text-white`}
-            >
-              {isSyncingVoices ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Sync ElevenLabs Voices
-                </>
-              )}
-            </button>
           </div>
-
-          {/* Sync Message */}
-          {syncMessage && (
-            <div className={`mt-4 p-4 rounded-lg ${
-              syncMessage.type === 'success'
-                ? 'bg-primary/10 border border-primary/20 text-primary'
-                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-400'
-            }`}>
-              <div className="flex items-center gap-2">
-                {syncMessage.type === 'success' ? (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                )}
-                <span className="text-sm font-medium">{syncMessage.text}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Filters */}
@@ -674,10 +569,7 @@ export default function VoiceLabPage() {
                 }`}
               >
                 <option value="all">All Providers</option>
-                <option value="cartesia">Cartesia (Ultra-Fast)</option>
-                <option value="elevenlabs">ElevenLabs (High Quality)</option>
-                <option value="openai">OpenAI (Balanced)</option>
-                <option value="sarvam">Sarvam (Indian Languages)</option>
+                <option value="piper">Piper (Local Offline TTS)</option>
               </select>
             </div>
 
