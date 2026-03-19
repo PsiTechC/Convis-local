@@ -4,8 +4,8 @@ Provider Factory - Dynamically create ASR/TTS providers based on configuration
 
 import logging
 from typing import Optional
-from .asr import ASRProvider, DeepgramASR, OpenAIASR, SarvamASR, GoogleASR, WhisperLocalASR
-from .tts import TTSProvider, CartesiaTTS, ElevenLabsTTS, OpenAITTS, SarvamTTS, PiperTTS, XttsTTS
+from .asr import ASRProvider, DeepgramASR, OpenAIASR, SarvamASR, GoogleASR
+from .tts import TTSProvider, CartesiaTTS, ElevenLabsTTS, OpenAITTS, SarvamTTS, PiperTTS
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ class ProviderFactory:
         'openai': OpenAIASR,
         'sarvam': SarvamASR,
         'google': GoogleASR,
-        'whisper_local': WhisperLocalASR,
     }
 
     TTS_PROVIDERS = {
@@ -28,7 +27,6 @@ class ProviderFactory:
         'openai': OpenAITTS,
         'sarvam': SarvamTTS,
         'piper': PiperTTS,
-        'xtts': XttsTTS,
     }
 
     @classmethod
@@ -229,50 +227,38 @@ class ProviderFactory:
             'speed': {
                 'asr_provider': 'deepgram',
                 'asr_model': 'nova-2',
-                'tts_provider': 'elevenlabs',
-                'tts_voice': 'alloy',
-                'tts_model': 'eleven_flash_v2_5',
-                'llm_provider': 'openai',
-                'llm_model': 'gpt-4-turbo',
-                'description': 'Standard configuration (Deepgram + GPT-4 Turbo + ElevenLabs Flash v2.5)',
-                'estimated_latency_ms': 300,
-                'estimated_cost_per_min': 0.12
+                'tts_provider': 'cartesia',
+                'tts_voice': 'sonic',
+                'description': 'Fastest configuration (180-320ms latency)',
+                'estimated_latency_ms': 250,
+                'estimated_cost_per_min': 0.11
             },
             'cost': {
                 'asr_provider': 'deepgram',
                 'asr_model': 'nova-2',
-                'tts_provider': 'elevenlabs',
-                'tts_voice': 'alloy',
-                'tts_model': 'eleven_flash_v2_5',
-                'llm_provider': 'openai',
-                'llm_model': 'gpt-4-turbo',
-                'description': 'Standard configuration',
-                'estimated_latency_ms': 300,
-                'estimated_cost_per_min': 0.12
+                'tts_provider': 'cartesia',
+                'tts_voice': 'sonic',
+                'description': 'Most economical (64% cheaper than OpenAI Realtime)',
+                'estimated_latency_ms': 250,
+                'estimated_cost_per_min': 0.11
             },
             'quality': {
                 'asr_provider': 'deepgram',
                 'asr_model': 'nova-2',
                 'tts_provider': 'elevenlabs',
-                'tts_voice': 'alloy',
-                'tts_model': 'eleven_flash_v2_5',
-                'llm_provider': 'openai',
-                'llm_model': 'gpt-4-turbo',
-                'description': 'Standard configuration',
+                'tts_voice': 'rachel',
+                'description': 'Best voice quality',
                 'estimated_latency_ms': 300,
                 'estimated_cost_per_min': 0.12
             },
             'balanced': {
                 'asr_provider': 'deepgram',
                 'asr_model': 'nova-2',
-                'tts_provider': 'elevenlabs',
-                'tts_voice': 'alloy',
-                'tts_model': 'eleven_flash_v2_5',
-                'llm_provider': 'openai',
-                'llm_model': 'gpt-4-turbo',
-                'description': 'Standard configuration (Deepgram + GPT-4 Turbo + ElevenLabs Flash v2.5)',
-                'estimated_latency_ms': 300,
-                'estimated_cost_per_min': 0.12
+                'tts_provider': 'cartesia',
+                'tts_voice': 'sonic',
+                'description': 'Best balance of speed, cost, and quality',
+                'estimated_latency_ms': 250,
+                'estimated_cost_per_min': 0.11
             }
         }
 

@@ -1,27 +1,6 @@
 version: '3.8'
 
 services:
-  # MongoDB
-  mongo:
-    image: mongo:7
-    container_name: convis-mongo
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=psitech
-      - MONGO_INITDB_ROOT_PASSWORD=KajuPista$25
-      - MONGO_INITDB_DATABASE=convis_python
-    volumes:
-      - mongo-data:/data/db
-    networks:
-      - convis-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Redis for campaign system (optional but recommended)
   redis:
     image: redis:7-alpine
@@ -64,7 +43,7 @@ services:
     container_name: convis-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8010:8000"
     environment:
       # MongoDB Configuration
       - MONGODB_URI=${MONGODB_URI}
@@ -146,8 +125,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -160,12 +137,10 @@ services:
     build:
       context: ./convis-web
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: convis-web
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3010:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
@@ -253,7 +228,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Nginx Reverse Proxy
+  # Nginx Reverse Proxy (optional)
   nginx:
     image: nginx:alpine
     container_name: convis-nginx
@@ -263,28 +238,21 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - certbot-etc:/etc/nginx/ssl:ro
-      - certbot-www:/var/www/certbot:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
       - nginx-logs:/var/log/nginx
     depends_on:
       - api
       - web
     networks:
       - convis-network
-
-  # Certbot for SSL certificates
-  certbot:
-    image: certbot/certbot
-    container_name: convis-certbot
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # Persistent volumes for data
 volumes:
-  mongo-data:
-    driver: local
   redis-data:
     driver: local
   api-uploads:
@@ -296,10 +264,6 @@ volumes:
   torch-hub-cache:
     driver: local  # Cache Silero VAD model (~2MB) to avoid re-download on restart
   nginx-logs:
-    driver: local
-  certbot-etc:
-    driver: local
-  certbot-www:
     driver: local
   n8n-data:
     driver: local

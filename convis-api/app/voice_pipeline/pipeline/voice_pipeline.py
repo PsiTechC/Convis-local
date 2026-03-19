@@ -6,16 +6,15 @@ Orchestrates: Twilio Audio → Deepgram → OpenAI LLM → ElevenLabs/Cartesia �
 import asyncio
 import base64
 import json
-import os
 import uuid
 from typing import Dict, Any
 from datetime import datetime
 from app.voice_pipeline.helpers.logger_config import configure_logger
 from app.voice_pipeline.helpers.utils import create_ws_data_packet, timestamp_ms
 from app.voice_pipeline.helpers.mark_event_meta_data import MarkEventMetaData
-from app.voice_pipeline.transcriber import DeepgramTranscriber, SarvamTranscriber, GoogleTranscriber, OpenAITranscriber, WhisperLocalTranscriber
+from app.voice_pipeline.transcriber import DeepgramTranscriber, SarvamTranscriber, GoogleTranscriber, OpenAITranscriber
 from app.voice_pipeline.llm import OpenAiLLM
-from app.voice_pipeline.synthesizer import ElevenlabsSynthesizer, CartesiaSynthesizer, OpenAISynthesizer, SarvamSynthesizer, XTTSSynthesizer
+from app.voice_pipeline.synthesizer import ElevenlabsSynthesizer, CartesiaSynthesizer, OpenAISynthesizer, SarvamSynthesizer
 
 logger = configure_logger(__name__)
 
@@ -261,18 +260,6 @@ class VoicePipeline:
                 transcriber_key=self.api_keys.get('openai'),
                 noise_suppression_level=noise_level
             )
-        elif transcriber_provider == 'whisper_local':
-            logger.info("[VOICE_PIPELINE] Creating local faster-whisper transcriber")
-            return WhisperLocalTranscriber(
-                telephony_provider='twilio',
-                input_queue=self.audio_input_queue,
-                output_queue=self.transcriber_output_queue,
-                model=self.assistant_config.get('transcriber', {}).get('model', 'medium'),
-                language=self.assistant_config.get('transcriber', {}).get('language', 'en'),
-                endpointing=endpointing,
-                transcriber_key=self.api_keys.get('whisper_local') or os.getenv('WHISPER_API_URL', 'http://localhost:8080'),
-                noise_suppression_level=noise_level
-            )
         else:
             raise ValueError(f"Unsupported transcriber provider: {transcriber_provider}")
 
@@ -281,33 +268,19 @@ class VoicePipeline:
         llm_provider = self.assistant_config.get('llm', {}).get('provider', 'openai')
 
         if llm_provider == 'openai':
-            model = self.assistant_config.get('llm', {}).get('model', 'gpt-4-turbo')
+            model = self.assistant_config.get('llm', {}).get('model', 'gpt-4o-mini')
             logger.info(f"[VOICE_PIPELINE] Creating OpenAI LLM with model: {model}")
             return OpenAiLLM(
                 model=model,
-                max_tokens=self.assistant_config.get('llm', {}).get('max_tokens', 100),
-                temperature=self.assistant_config.get('llm', {}).get('temperature', 0.9),
-                buffer_size=40,
+                max_tokens=self.assistant_config.get('llm', {}).get('max_tokens', 100),  # Shorter responses
+                temperature=self.assistant_config.get('llm', {}).get('temperature', 0.9),  # More natural variation
+                buffer_size=40,  # Legacy fallback
                 llm_key=self.api_keys.get('openai'),
-                streaming_mode="ultra_fast",
-                min_chunk_chars=8,
-                max_buffer_chars=60
-            )
-        elif llm_provider == 'ollama':
-            model = self.assistant_config.get('llm', {}).get('model', 'llama3:8b')
-            ollama_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434') + '/v1'
-            logger.info(f"[VOICE_PIPELINE] Creating Ollama LLM with model: {model}, URL: {ollama_url}")
-            return OpenAiLLM(
-                model=model,
-                max_tokens=self.assistant_config.get('llm', {}).get('max_tokens', 150),
-                temperature=self.assistant_config.get('llm', {}).get('temperature', 0.7),
-                buffer_size=40,
-                provider="custom",
-                base_url=ollama_url,
-                llm_key="ollama",
-                streaming_mode="ultra_fast",
-                min_chunk_chars=8,
-                max_buffer_chars=60
+                # ULTRA-FAST STREAMING: Don't wait for sentences - stream immediately
+                # Options: "ultra_fast" (8+ chars), "fast" (clause boundaries), "natural" (sentences)
+                streaming_mode="ultra_fast",  # Fastest possible - yield at word boundaries
+                min_chunk_chars=8,  # Very low threshold for fastest first response
+                max_buffer_chars=60  # Force yield quickly if no word boundary
             )
         else:
             raise ValueError(f"Unsupported LLM provider: {llm_provider}")
@@ -356,19 +329,6 @@ class VoicePipeline:
                 sampling_rate=8000,
                 use_mulaw=True,  # Twilio requires μ-law
                 speed=self.assistant_config.get('tts_speed', 1.0),  # User-configurable speed
-                task_manager_instance=task_manager
-            )
-        elif synthesizer_provider == 'xtts':
-            logger.info("[VOICE_PIPELINE] Creating XTTS v2 synthesizer (local)")
-            return XTTSSynthesizer(
-                voice=self.assistant_config.get('synthesizer', {}).get('voice', 'default'),
-                voice_id=self.assistant_config.get('synthesizer', {}).get('voice_id'),
-                model='xtts_v2',
-                synthesizer_key=self.api_keys.get('xtts') or os.getenv('XTTS_API_URL', 'http://localhost:5500'),
-                stream=True,
-                use_mulaw=True,
-                speed=self.assistant_config.get('tts_speed', 1.0),
-                language=self.assistant_config.get('synthesizer', {}).get('language', 'en'),
                 task_manager_instance=task_manager
             )
         elif synthesizer_provider == 'sarvam':

@@ -1,0 +1,84 @@
+CONVIS PROJECT - AWS DEPLOYMENT COST ANALYSIS
+Generated: 2026-03-18
+
+=== CURRENT AWS SETUP (g4dn.xlarge - Mumbai) ===
+
+ITEM,COST PER HOUR,COST PER DAY,COST PER MONTH,NOTES
+g4dn.xlarge Instance (On-Demand),$0.526,$12.62,$384.00,4 vCPU 16GB RAM T4 16GB GPU
+100GB gp3 Storage,-,-,$10.00,Persistent even when stopped
+Data Transfer (50GB/month),-,-,$5.00,Outbound data to internet
+Twilio Phone Number,-,-,$1.00,Per phone number per month
+Twilio Call Charges,-,-,Variable,$0.02/min per call
+Domain Name (optional),-,-,$1.00,Annual cost divided by 12
+SSL Certificate,-,-,$0.00,Free via Let's Encrypt
+TOTAL (24/7 Running),-,-,$401.00,Minimum monthly cost
+
+=== USAGE-BASED INSTANCE COSTS ===
+
+USAGE PATTERN,HOURS/MONTH,INSTANCE COST,STORAGE,TOTAL/MONTH
+Always On (24/7),730,$384,$10,$394
+12 hours/day,365,$192,$10,$202
+8 hours/day (Work Hours),240,$128,$10,$138
+4 hours/day (Testing),120,$63,$10,$73
+Weekends Only (20 hrs/week),80,$42,$10,$52
+Stopped (Not Using),0,$0,$10,$10
+
+=== SAVINGS OPTIONS ===
+
+OPTION,MONTHLY COST,SAVINGS VS ON-DEMAND,COMMITMENT
+On-Demand (Current),$384,0%,None
+Spot Instance,$115-150,60-70%,Can be interrupted
+1-Year Reserved,$240,37%,1 year commitment
+3-Year Reserved,$150,61%,3 year commitment
+
+=== CLOUD APIs REPLACED (NO LONGER PAYING) ===
+
+SERVICE,PREVIOUS COST/MONTH,CURRENT COST,REPLACED BY
+OpenAI GPT-4,$5-50,$0,Ollama + llama3:8b
+Deepgram STT,$0-20,$0,faster-whisper medium
+ElevenLabs TTS,$5-22,$0,Coqui XTTS v2
+Cartesia TTS,$0-20,$0,Coqui XTTS v2
+Sarvam TTS,$0-10,$0,Coqui XTTS v2
+Redis Cloud,$0-15,$0,Local Redis (Docker)
+MongoDB Atlas,$0-57,$0,Local MongoDB (Docker)
+TOTAL SAVED,$10-194/month,$0,All self-hosted
+
+=== COMPARISON: SELF-HOSTED vs CLOUD APIs ===
+
+SCENARIO,SELF-HOSTED (AWS GPU),CLOUD APIs (No GPU),DIFFERENCE
+Server Cost,$384 (g4dn.xlarge),$30 (t3.medium),+$354
+OpenAI,$0,$5-50,-$5 to -$50
+Deepgram,$0,$0-20,-$0 to -$20
+ElevenLabs,$0,$5-22,-$5 to -$22
+Other APIs,$0,$0-30,-$0 to -$30
+Storage,$10,$4,+$6
+TOTAL,$394/month,$44-156/month,+$238 to +$350
+
+=== WHEN SELF-HOSTING MAKES SENSE ===
+
+FACTOR,CLOUD APIs WIN,SELF-HOSTED WINS
+Low Call Volume (<500 calls/month),YES,NO
+High Call Volume (>2000 calls/month),NO,YES
+Data Privacy Required,NO,YES
+No Third-Party Dependencies,NO,YES
+Lowest Monthly Cost,YES,NO
+Best AI Quality,YES,NO
+Zero Maintenance,YES,NO
+
+=== GPU VRAM USAGE ===
+
+MODEL,VRAM USED,TOTAL AVAILABLE,UTILIZATION
+Ollama llama3:8b,5GB,16GB,31%
+faster-whisper medium,3GB,16GB,19%
+Coqui XTTS v2,2GB,16GB,13%
+TOTAL USED,10GB,16GB,63%
+REMAINING,6GB,-,Available for more models
+
+=== ALTERNATIVE GPU INSTANCES ===
+
+INSTANCE,GPU,VRAM,vCPU,RAM,ON-DEMAND/MONTH,SPOT/MONTH
+g4dn.xlarge,T4,16GB,4,16GB,$384,$115
+g4dn.2xlarge,T4,16GB,8,32GB,$600,$180
+g5.xlarge,A10G,24GB,4,16GB,$730,$250
+g5.2xlarge,A10G,24GB,8,32GB,$880,$300
+p3.2xlarge,V100,16GB,8,61GB,$1200,$360

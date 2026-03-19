@@ -1,0 +1,34 @@
+CLOUD APIs (Before),What It Does,Pricing Unit,Cost Per Unit,Cost Per 3-min Call
+OpenAI GPT-4o-mini,AI Brain,1M input tokens,$0.15,~$0.01
+OpenAI GPT-4o-mini,AI Brain,1M output tokens,$0.60,~$0.01
+Deepgram Nova-2,Speech to Text,Per minute of audio,$0.0043,~$0.013
+ElevenLabs,Text to Speech,Per 1000 characters,$0.30,~$0.15
+Twilio,Phone Calls (India),Per minute,$0.023,~$0.07
+,,,Total per call,~$0.25
+,,,100 calls/month,~$25
+,,,500 calls/month,~$125
+,,,1000 calls/month,~$250
+,,,,,
+SELF-HOSTED (After),What It Does,Replaces,Cost Per Unit,Cost Per 3-min Call
+Mistral 7B (Ollama),AI Brain,OpenAI,$0 (self-hosted),$0
+faster-whisper medium,Speech to Text,Deepgram,$0 (self-hosted),$0
+Piper TTS,Text to Speech,ElevenLabs,$0 (self-hosted),$0
+Twilio,Phone Calls (India),Cannot replace,$0.023/min,~$0.07
+,,,Total per call,~$0.07 (Twilio only)
+,,,100 calls/month,~$7
+,,,500 calls/month,~$35
+,,,1000 calls/month,~$70
+,,,,,
+AWS FIXED COSTS,Item,,Cost/Month,
+,g4dn.xlarge (24/7),,~$384,
+,100GB Storage,,~$10,
+,Data Transfer,,~$5,
+,,,Total Fixed,~$400
+,,,,,
+TOTAL MONTHLY COST,Calls/Month,Cloud APIs,Self-Hosted (AWS + Twilio),Savings
+,100,$25,$407,Cloud is cheaper
+,500,$125,$435,Cloud is cheaper
+,1000,$250,$470,Cloud is cheaper
+,2000,$500,$540,Almost same
+,5000,$1250,$750,Self-hosted saves $500
+,10000,$2500,$1100,Self-hosted saves $1400

@@ -1,0 +1,46 @@
+Service,Model/Tier,Unit,Cost Per Unit,100 Calls/Month,500 Calls/Month,1000 Calls/Month,Notes
+,,,,,,,
+OPENAI (LLM),,,,,,,"Prices per 1M tokens"
+,GPT-4 Turbo,1M input tokens,$10.00,$5.00,$25.00,$50.00,~500 tokens per call input
+,GPT-4 Turbo,1M output tokens,$30.00,$3.00,$15.00,$30.00,~100 tokens per call output
+,GPT-4o,1M input tokens,$2.50,$1.25,$6.25,$12.50,Cheaper alternative
+,GPT-4o,1M output tokens,$10.00,$1.00,$5.00,$10.00,
+,GPT-4o-mini,1M input tokens,$0.15,$0.08,$0.38,$0.75,Cheapest option
+,GPT-4o-mini,1M output tokens,$0.60,$0.06,$0.30,$0.60,
+,,,,,,,
+DEEPGRAM (STT),,,,,,,"Speech-to-text pricing"
+,Nova-2,Per minute audio,$0.0043,$1.29,$6.45,$12.90,~3 min avg call
+,Nova-2 (Pay-as-you-go),Per minute audio,$0.0059,$1.77,$8.85,$17.70,No commitment
+,Whisper Cloud,Per minute audio,$0.0048,$1.44,$7.20,$14.40,OpenAI Whisper hosted
+,Free Credit,First $200,-,$0.00,$0.00,$0.00,New account bonus
+,,,,,,,
+ELEVENLABS (TTS),,,,,,,"Text-to-speech pricing"
+,Free Tier,10000 chars/month,$0.00,$0.00,-,-,~2-3 calls only
+,Starter,30000 chars/month,$5.00,$5.00,$5.00,-,Not enough for 500+ calls
+,Creator,100000 chars/month,$22.00,$22.00,$22.00,$22.00,~200 calls worth
+,Pro,500000 chars/month,$99.00,-,$99.00,$99.00,~1000 calls
+,Scale,2000000 chars/month,$330.00,-,-,$330.00,High volume
+,Per char (overage),Per 1000 chars,$0.30,$15.00,$75.00,$150.00,~500 chars per call response
+,,,,,,,
+CARTESIA (TTS),,,,,,,"Alternative TTS"
+,Pay-as-you-go,Per 1000 chars,$0.10,$5.00,$25.00,$50.00,~500 chars per call
+,Pro Plan,Unlimited,$49.00,$49.00,$49.00,$49.00,Best for high volume
+,,,,,,,
+SARVAM (TTS),,,,,,,"Indian language TTS"
+,Pay-as-you-go,Per 1000 chars,$0.05,$2.50,$12.50,$25.00,Hindi/Indian languages
+,,,,,,,
+TWILIO (Telephony),,,,,,,"Required - cannot replace"
+,Phone Number,Per number/month,$1.00,$1.00,$1.00,$1.00,
+,Outbound Call (US),Per minute,$0.014,$4.20,$21.00,$42.00,~3 min avg call
+,Outbound Call (India),Per minute,$0.023,$6.90,$34.50,$69.00,~3 min avg call
+,Inbound Call (US),Per minute,$0.0085,$2.55,$12.75,$25.50,
+,,,,,,,
+TOTAL ESTIMATES,,,,,,,"Per month at different volumes"
+,Low Volume (GPT-4o-mini + Deepgram + ElevenLabs Starter),,,$8.00,-,-,100 calls
+,Medium Volume (GPT-4o + Deepgram + ElevenLabs Creator),,,-,$55.00,-,500 calls
+,High Volume (GPT-4 Turbo + Deepgram + ElevenLabs Pro),,,,-,$160.00,1000 calls
+,+ Twilio (India calls),,,+$8,$36,$72,Add to above
+,,,,,,,
+SELF-HOSTED (Current AWS Setup),,,,,,,"Fixed cost regardless of volume"
+,g4dn.xlarge + all local models,,,$400,$400,$400,Same cost at any volume
+,Break-even point,,,,,"~800-1000 calls/month",Self-hosted becomes cheaper

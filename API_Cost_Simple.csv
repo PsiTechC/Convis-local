@@ -1,0 +1,12 @@
+Service,What It Does,Pricing Unit,Cost Per Unit,Cost Per 3-min Call
+OpenAI GPT-4o-mini,AI Brain,1M input tokens,$0.15,~$0.01
+OpenAI GPT-4o-mini,AI Brain,1M output tokens,$0.60,~$0.01
+Deepgram Nova-2,Speech to Text,Per minute of audio,$0.0043,~$0.013
+ElevenLabs,Text to Speech,Per 1000 characters,$0.30,~$0.15
+Twilio,Phone Calls (India),Per minute,$0.023,~$0.07
+,,,Total per call,~$0.25
+,,,100 calls/month,~$25
+,,,500 calls/month,~$125
+,,,1000 calls/month,~$250
+,,,,,
+Self-Hosted (AWS),All included,Fixed monthly,$400,Same at any volume

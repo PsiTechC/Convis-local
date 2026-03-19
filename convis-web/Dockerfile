@@ -27,11 +27,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV SKIP_ENV_VALIDATION=1
 
-# Accept API URL as build arg so Next.js bakes it into the JS bundle
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-
-# Build the application
+# Build the application (uses .env.production file)
 RUN npm run build
 
 # Production image, copy all the files and run next

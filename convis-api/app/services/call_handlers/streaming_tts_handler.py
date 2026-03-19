@@ -43,8 +43,8 @@ class StreamingElevenLabsTTS:
     def __init__(
         self,
         api_key: str,
-        voice: str = "alloy",
-        model: str = "eleven_flash_v2_5",
+        voice: str = "shimmer",
+        model: str = "eleven_turbo_v2_5",  # Fastest model!
         output_format: str = "ulaw_8000"  # ulaw_8000 for Twilio, pcm_16000 for browser
     ):
         self.api_key = api_key
@@ -79,10 +79,10 @@ class StreamingElevenLabsTTS:
                 "text": text,
                 "model_id": self.model,
                 "voice_settings": {
-                    "stability": 0.5,  # Balanced — avoids robotic sound
-                    "similarity_boost": 0.75,  # Higher = clearer voice clone
+                    "stability": 0.7,  # Higher = more stable/slower speech
+                    "similarity_boost": 0.5,  # Lower = more natural variation
                     "style": 0.0,
-                    "use_speaker_boost": True  # Boost clarity for laptop speakers
+                    "use_speaker_boost": False  # Disable for more natural sound
                 }
             }
             
@@ -136,10 +136,8 @@ class StreamingElevenLabsTTS:
                 "text": text,
                 "model_id": self.model,
                 "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75,
-                    "style": 0.0,
-                    "use_speaker_boost": True
+                    "stability": 0.7,  # Higher = more stable/slower speech
+                    "similarity_boost": 0.5   # Lower = more natural variation
                 }
             }
             
@@ -173,7 +171,7 @@ class StreamingOpenAITTS:
     def __init__(
         self,
         client,  # AsyncOpenAI client
-        voice: str = "alloy",
+        voice: str = "shimmer",
         model: str = "tts-1",  # tts-1 is faster than tts-1-hd
         for_browser: bool = False  # True = PCM 16kHz output for browser, False = μ-law 8kHz for Twilio
     ):

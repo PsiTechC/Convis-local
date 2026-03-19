@@ -1094,9 +1094,17 @@ async def assign_assistant_to_phone_number(request: Request, assignment: AssignA
         else:
             base_url = f"{request.url.scheme}://{request.url.netloc}"
 
-        # Route to custom stream handler
-        webhook_url = f"{base_url}/api/inbound-calls/connect/{assignment.assistant_id}"
-        logger.info(f"[PHONE] Webhook URL: {webhook_url}")
+        # Determine which webhook endpoint to use based on voice_mode
+        voice_mode = assistant_doc.get('voice_mode', 'realtime')
+
+        if voice_mode == 'custom':
+            # Bolna-style: use /connect endpoint that returns TwiML with WebSocket URL
+            webhook_url = f"{base_url}/api/inbound-calls/connect/{assignment.assistant_id}"
+            logger.info(f"[CUSTOM_MODE] Generated Bolna-style webhook URL: {webhook_url}")
+        else:
+            # Realtime API: use existing incoming-call endpoint
+            webhook_url = f"{base_url}/api/inbound-calls/incoming-call/{assignment.assistant_id}"
+            logger.info(f"[REALTIME_MODE] Generated realtime webhook URL: {webhook_url}")
 
         # Update phone number document
         update_doc = {
@@ -1606,9 +1614,9 @@ async def calculate_call_cost(call_sid: str, currency: str = "USD"):
                 asr_provider=call_log.get("asr_provider", "deepgram"),
                 asr_model=call_log.get("asr_model", "nova-2"),
                 llm_provider=call_log.get("llm_provider", "openai"),
-                llm_model=call_log.get("llm_model", "gpt-4-turbo"),
-                tts_provider=call_log.get("tts_provider", "elevenlabs"),
-                tts_model=call_log.get("tts_model", "eleven_flash_v2_5"),
+                llm_model=call_log.get("llm_model", "gpt-4o-mini"),
+                tts_provider=call_log.get("tts_provider", "openai"),
+                tts_model=call_log.get("tts_model", "tts-1"),
                 duration_minutes=duration_minutes,
                 estimated_tokens_in=call_log.get("estimated_tokens_in", 500),
                 estimated_tokens_out=call_log.get("estimated_tokens_out", 300),
@@ -1645,7 +1653,7 @@ async def calculate_call_cost(call_sid: str, currency: str = "USD"):
 
 @router.get("/estimate-cost")
 async def estimate_call_cost(
-    voice_mode: str = "custom",
+    voice_mode: str = "realtime",
     duration_minutes: float = 1.0,
     currency: str = "USD",
     model: Optional[str] = None,

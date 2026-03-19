@@ -140,7 +140,7 @@ class WebRTCVoiceHandler:
         """Initialize pipeline components"""
         logger.info("[WEBRTC-HANDLER] Initializing voice pipeline...")
 
-        # Initialize ASR — hardcoded to Deepgram Nova-2
+        # Initialize ASR based on configured provider
         asr_provider = self.config.get("asr_provider", "deepgram").lower()
 
         if asr_provider == "whisper":
@@ -162,7 +162,7 @@ class WebRTCVoiceHandler:
                 raise ValueError("Deepgram API key required for streaming ASR")
             self.asr = StreamingDeepgramASR(
                 api_key=deepgram_key,
-                model=self.config.get("asr_model", "nova-2"),
+                model=self.config.get("asr_model", "nova-3"),
                 language=self.config.get("asr_language", "en"),
                 sample_rate=16000,
                 encoding="linear16",
@@ -179,26 +179,19 @@ class WebRTCVoiceHandler:
         if llm_provider == "ollama":
             ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
             llm_client = openai.AsyncOpenAI(base_url=ollama_base_url, api_key="ollama")
-            default_model = "llama3.2"
-            # Resolve model name against actually available Ollama models
-            from app.utils.ollama_utils import resolve_ollama_model
-            requested_model = self.config.get("llm_model") or default_model
-            resolved_model = await resolve_ollama_model(requested_model)
-            if resolved_model != requested_model:
-                logger.info(f"[WEBRTC-HANDLER] Ollama model resolved: '{requested_model}' -> '{resolved_model}'")
+            default_model = "llama3.2:3b"
             logger.info(f"[WEBRTC-HANDLER] Using Ollama LLM at {ollama_base_url}")
         else:
             openai_key = self.provider_keys.get("openai") or os.getenv("OPENAI_API_KEY")
             if not openai_key:
                 raise ValueError("OpenAI API key required")
             llm_client = openai.AsyncOpenAI(api_key=openai_key)
-            default_model = "gpt-4-turbo"
-            resolved_model = self.config.get("llm_model") or default_model
+            default_model = "gpt-4o-mini"
 
         self.llm = StreamingLLMHandler(
             openai_client=llm_client,
-            model=resolved_model,
-            temperature=self.config.get("temperature", 0.7),
+            model=self.config.get("llm_model") or default_model,
+            temperature=self.config.get("temperature", 0.8),
             max_tokens=self.config.get("llm_max_tokens", 150)
         )
 
@@ -207,9 +200,27 @@ class WebRTCVoiceHandler:
         openai_client_for_tts = openai.AsyncOpenAI(api_key=openai_key) if openai_key else None
         await self._initialize_tts(openai_client_for_tts)
 
-        # Initialize conversation manager
+        # Initialize conversation manager with dynamic KB info
+        base_system_message = self.config.get("system_message", "You are a helpful assistant.")
+
+        # Add knowledge base information dynamically
+        try:
+            from app.utils.conversational_rag import get_kb_stats
+            kb_stats = get_kb_stats(self.assistant_id)
+            if kb_stats['exists'] and kb_stats['files_count'] > 0:
+                kb_info = f"\n\nYou have access to {kb_stats['files_count']} document(s) in your knowledge base:"
+                for i, filename in enumerate(kb_stats['files'][:10], 1):  # Show up to 10 files
+                    kb_info += f"\n{i}. {filename}"
+                kb_info += f"\n\nTotal information chunks: {kb_stats['total_chunks']}"
+                system_message = base_system_message + kb_info
+            else:
+                system_message = base_system_message
+        except Exception as e:
+            logger.warning(f"[WEBRTC-HANDLER] Could not load KB stats: {e}")
+            system_message = base_system_message
+
         self.conversation = ConversationManager(
-            system_message=self.config.get("system_message", "You are a helpful assistant."),
+            system_message=system_message,
             max_history=50
         )
 
@@ -230,7 +241,7 @@ class WebRTCVoiceHandler:
         )
 
         tts_provider = self.config.get("tts_provider", "elevenlabs").lower()
-        tts_voice = self.config.get("tts_voice", "alloy")
+        tts_voice = self.config.get("tts_voice", "shimmer")
 
         logger.info(f"[WEBRTC-HANDLER] Initializing TTS: {tts_provider}")
 
@@ -268,7 +279,7 @@ class WebRTCVoiceHandler:
                 raise ValueError("OpenAI API key required for OpenAI TTS")
             self.tts = StreamingOpenAITTS(
                 client=openai_client,
-                voice=tts_voice or "alloy",
+                voice=tts_voice or "shimmer",
                 for_browser=True
             )
         elif tts_provider == "piper":
@@ -279,19 +290,19 @@ class WebRTCVoiceHandler:
             )
             logger.info(f"[WEBRTC-HANDLER] Using Piper offline TTS (voice: {tts_voice})")
         else:
-            # Default to ElevenLabs Flash v2.5
+            # Default to ElevenLabs
             elevenlabs_key = self.provider_keys.get("elevenlabs") or os.getenv("ELEVENLABS_API_KEY")
             if elevenlabs_key:
                 self.tts = StreamingElevenLabsTTS(
                     api_key=elevenlabs_key,
-                    voice=tts_voice or "alloy",
-                    model=self.config.get("tts_model", "eleven_flash_v2_5"),
+                    voice=tts_voice or "shimmer",
+                    model="eleven_turbo_v2_5",
                     output_format="pcm_24000"
                 )
             elif openai_client:
                 self.tts = StreamingOpenAITTS(
                     client=openai_client,
-                    voice=tts_voice or "alloy",
+                    voice=tts_voice or "shimmer",
                     for_browser=True
                 )
             else:
@@ -438,7 +449,7 @@ class WebRTCVoiceHandler:
                 deepgram_key = self.provider_keys.get("deepgram") or os.getenv("DEEPGRAM_API_KEY")
                 self.asr = StreamingDeepgramASR(
                     api_key=deepgram_key,
-                    model=self.config.get("asr_model", "nova-2"),
+                    model=self.config.get("asr_model", "nova-3"),
                     language=self.config.get("asr_language", "en"),
                     sample_rate=16000,
                     encoding="linear16",
@@ -682,6 +693,31 @@ class WebRTCVoiceHandler:
 
             # Add to conversation
             self.conversation.add_user_message(text)
+
+            # Query knowledge base if available
+            try:
+                from app.utils.conversational_rag import search_conversation_context
+                from app.config.settings import settings
+
+                use_local = settings.embedding_model.lower() == "local"
+                context = await search_conversation_context(
+                    assistant_id=self.assistant_id,
+                    query=text,
+                    api_key=None if use_local else os.getenv("OPENAI_API_KEY"),
+                    top_k=5,  # Retrieve more results
+                    relevance_threshold=0.4,  # Lower threshold to catch more relevant docs
+                    use_local_embeddings=use_local
+                )
+
+                if context:
+                    logger.info(f"[WEBRTC-HANDLER] Retrieved knowledge base context ({len(context)} chars)")
+                    # Inject context as a system message (insert before the last user message)
+                    self.conversation.history.insert(-1, {
+                        "role": "system",
+                        "content": f"Relevant information from knowledge base:\n{context}\n\nUse this information to answer the user's question."
+                    })
+            except Exception as e:
+                logger.warning(f"[WEBRTC-HANDLER] Knowledge base query failed: {e}")
 
             first_audio_sent = False
             llm_start = time.time()

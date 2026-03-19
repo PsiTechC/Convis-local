@@ -14,6 +14,7 @@ import {
   ENHANCED_ASR_MODELS,
   ENHANCED_TTS_MODELS,
   ENHANCED_LLM_MODELS,
+  fetchElevenLabsVoices
 } from './provider-config';
 
 type SupportedProvider = 'openai' | 'anthropic' | 'azure_openai' | 'google' | 'custom';
@@ -241,14 +242,21 @@ const LANGUAGE_OPTIONS = [
   { value: 'tr', label: 'Turkish (Türkçe)', flag: '🇹🇷' },
 ];
 
-// Piper voices - mapped from provider-config.ts
-const VOICE_OPTIONS: VoiceOption[] = ENHANCED_TTS_VOICES.piper.map(v => ({
-  value: v.value,
-  label: v.label.split(' - ')[0], // Just the name
-  gender: v.gender === 'female' ? 'Female' : v.gender === 'male' ? 'Male' : 'Neutral',
-  accent: v.accent,
-  description: v.label.split(' - ')[1] || v.accent,
-}));
+const VOICE_OPTIONS: VoiceOption[] = [
+  { value: 'alloy', label: 'Alloy', gender: 'Neutral', accent: 'American', description: 'Balanced and versatile' },
+  { value: 'ash', label: 'Ash', gender: 'Male', accent: 'British', description: 'Clear and articulate' },
+  { value: 'ballad', label: 'Ballad', gender: 'Male', accent: 'American', description: 'Smooth and calm' },
+  { value: 'cedar', label: 'Cedar', gender: 'Male', accent: 'American', description: 'Warm and steady' },
+  { value: 'coral', label: 'Coral', gender: 'Female', accent: 'American', description: 'Bright and friendly' },
+  { value: 'echo', label: 'Echo', gender: 'Male', accent: 'American', description: 'Professional and clear' },
+  { value: 'fable', label: 'Fable', gender: 'Female', accent: 'British', description: 'Expressive and engaging' },
+  { value: 'marin', label: 'Marin', gender: 'Female', accent: 'Australian', description: 'Energetic and upbeat' },
+  { value: 'nova', label: 'Nova', gender: 'Female', accent: 'American', description: 'Youthful and energetic' },
+  { value: 'onyx', label: 'Onyx', gender: 'Male', accent: 'American', description: 'Deep and authoritative' },
+  { value: 'sage', label: 'Sage', gender: 'Female', accent: 'American', description: 'Soft and reassuring' },
+  { value: 'shimmer', label: 'Shimmer', gender: 'Female', accent: 'American', description: 'Cheerful and warm' },
+  { value: 'verse', label: 'Verse', gender: 'Male', accent: 'American', description: 'Conversational and natural' },
+];
 
 // ASR Provider Models from provider-config.ts (imported as ENHANCED_ASR_MODELS)
 const ASR_MODELS = ENHANCED_ASR_MODELS;
@@ -260,6 +268,7 @@ const TTS_VOICES = ENHANCED_TTS_VOICES;
 const TTS_MODELS = ENHANCED_TTS_MODELS;
 
 // LLM Provider Models from provider-config.ts (imported as ENHANCED_LLM_MODELS)
+const LLM_MODELS = ENHANCED_LLM_MODELS;
 
 const ASR_LANGUAGES = [
   { value: 'auto', label: 'Auto-detect (Multilingual)' },
@@ -290,7 +299,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Handle customer inquiries, provide support, and resolve issues professionally',
     icon: '💬',
     system_message: 'You are a professional and friendly customer support agent. Your goal is to help customers resolve their issues efficiently while maintaining a positive and empathetic tone. Always listen carefully to their concerns, provide clear solutions, and ensure customer satisfaction.',
-    voice: 'en_US-lessac-medium',
+    voice: 'alloy',
     temperature: 0.7,
     color: 'from-blue-500 to-blue-600',
   },
@@ -300,8 +309,8 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Engage prospects, answer questions, and drive sales conversations',
     icon: '💼',
     system_message: 'You are a knowledgeable and persuasive sales assistant. Your role is to understand customer needs, present product benefits effectively, handle objections professionally, and guide prospects through the sales process. Be consultative, not pushy.',
-    voice: 'en_US-lessac-medium',
-    temperature: 0.7,
+    voice: 'nova',
+    temperature: 0.8,
     color: 'from-green-500 to-green-600',
   },
   {
@@ -310,7 +319,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Book appointments, manage calendars, and send reminders',
     icon: '📅',
     system_message: 'You are an efficient appointment scheduling assistant. Help users book, reschedule, and manage appointments. Check availability, confirm details, send reminders, and ensure smooth scheduling. Be organized and detail-oriented.',
-    voice: 'en_US-lessac-medium',
+    voice: 'shimmer',
     temperature: 0.5,
     color: 'from-purple-500 to-purple-600',
   },
@@ -320,7 +329,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Qualify leads by asking relevant questions and gathering information',
     icon: '🎯',
     system_message: 'You are a lead qualification specialist. Ask targeted questions to understand prospect needs, budget, timeline, and decision-making process. Gather essential information to determine if the lead is qualified. Be professional and conversational.',
-    voice: 'en_US-lessac-medium',
+    voice: 'onyx',
     temperature: 0.6,
     color: 'from-orange-500 to-orange-600',
   },
@@ -330,7 +339,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Greet callers, route calls, and provide basic information',
     icon: '📞',
     system_message: 'You are a professional virtual receptionist. Greet callers warmly, understand their needs, provide information about the company, and route calls appropriately. Handle inquiries efficiently while maintaining a friendly demeanor.',
-    voice: 'en_US-lessac-medium',
+    voice: 'echo',
     temperature: 0.6,
     color: 'from-pink-500 to-pink-600',
   },
@@ -340,7 +349,7 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
     description: 'Gather customer feedback and conduct satisfaction surveys',
     icon: '⭐',
     system_message: 'You are a feedback collection specialist. Conduct surveys, gather customer opinions, and collect testimonials. Ask thoughtful questions, encourage honest feedback, and make the process enjoyable. Be appreciative and non-intrusive.',
-    voice: 'en_US-lessac-medium',
+    voice: 'fable',
     temperature: 0.7,
     color: 'from-yellow-500 to-yellow-600',
   },
@@ -389,27 +398,29 @@ export default function AIAgentPage() {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [voiceGenderFilter, setVoiceGenderFilter] = useState<'All' | 'Male' | 'Female' | 'Neutral'>('All');
   const [voiceAccentFilter, setVoiceAccentFilter] = useState<string>('All');
+  const [liveElevenLabsVoices, setLiveElevenLabsVoices] = useState<Array<{value: string, label: string, gender: string, accent: string}> | null>(null);
+  const [isSyncingVoices, setIsSyncingVoices] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     system_message: '',
-    voice: 'en_US-lessac-medium',
-    voice_mode: 'custom' as 'realtime' | 'custom',
-    temperature: 0.7,
+    voice: 'alloy',
+    voice_mode: 'realtime' as 'realtime' | 'custom',
+    temperature: 0.5,
     api_key_id: '',
     call_greeting: DEFAULT_CALL_GREETING,
     calendar_account_id: '',
     calendar_account_ids: [] as string[],
     calendar_enabled: false,
-    asr_provider: 'deepgram',
-    tts_provider: 'piper',
-    asr_model: 'nova-2',
+    asr_provider: 'openai',
+    tts_provider: 'openai',
+    asr_model: 'whisper-1',
     asr_language: 'en',
-    tts_voice: 'en_US-lessac-medium',
-    tts_model: 'medium',
+    tts_voice: 'alloy',
+    tts_model: 'tts-1',
     tts_speed: 1.0,
     audio_buffer_size: 200,
     llm_provider: 'openai',
-    llm_model: 'gpt-4-turbo',
+    llm_model: 'gpt-4o-mini',
     llm_max_tokens: 150,
     bot_language: 'en',
     noise_suppression_level: 'medium',
@@ -428,6 +439,18 @@ export default function AIAgentPage() {
     background_audio_type: 'custom',
     background_audio_volume: 0.25,
   });
+  const [providerMode, setProviderMode] = useState<'realtime' | 'custom'>('realtime');
+  const [currency, setCurrency] = useState<'USD' | 'INR'>('USD');
+  const [estimatedCost, setEstimatedCost] = useState<{
+    total_usd: number;
+    total_inr: number;
+    breakdown: { asr: number; llm: number; tts: number; twilio: number };
+    asr_cost_usd: number;
+    llm_cost_usd: number;
+    tts_cost_usd: number;
+    twilio_cost_usd: number;
+  } | null>(null);
+  const [isCalculatingCost, setIsCalculatingCost] = useState(false);
   const [databaseConfig, setDatabaseConfig] = useState({
     enabled: false,
     type: 'postgresql',
@@ -776,6 +799,59 @@ export default function AIAgentPage() {
     }
   }, [apiKeys, isEditMode, formData.api_key_id]);
 
+  // Cost calculation function
+  const calculateEstimatedCost = useCallback(async () => {
+    if (providerMode !== 'custom') {
+      setEstimatedCost(null);
+      return;
+    }
+
+    try {
+      setIsCalculatingCost(true);
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        voice_mode: 'custom',
+        duration_minutes: '1.0',
+        currency: currency,
+        asr_provider: formData.asr_provider,
+        asr_model: formData.asr_model,
+        llm_provider: formData.llm_provider,
+        llm_model: formData.llm_model,
+        tts_provider: formData.tts_provider,
+        tts_model: formData.tts_model,
+      });
+
+      const response = await fetch(`${API_URL}/api/phone-numbers/estimate-cost?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to calculate cost estimate');
+      }
+
+      const data = await response.json();
+      setEstimatedCost(data);
+    } catch (err) {
+      console.error('Cost calculation error:', err);
+      setEstimatedCost(null);
+    } finally {
+      setIsCalculatingCost(false);
+    }
+  }, [providerMode, currency, formData.asr_provider, formData.asr_model, formData.llm_provider, formData.llm_model, formData.tts_provider, formData.tts_model, API_URL]);
+
+  // Calculate cost whenever provider settings change
+  useEffect(() => {
+    if (providerMode === 'custom') {
+      calculateEstimatedCost();
+    } else {
+      setEstimatedCost(null);
+    }
+  }, [providerMode, formData.asr_provider, formData.asr_model, formData.llm_provider, formData.llm_model, formData.tts_provider, formData.tts_model, currency, calculateEstimatedCost]);
+
   const handleCreateAssistant = async () => {
     const token = localStorage.getItem('token');
     const userId = user?.clientId || user?._id || user?.id;
@@ -813,41 +889,40 @@ export default function AIAgentPage() {
             name: formData.name,
             system_message: formData.system_message,
             voice: formData.voice,
-            voice_mode: 'custom',
-            temperature: 0.7,
+            voice_mode: formData.voice_mode || (providerMode === 'custom' ? 'custom' : 'realtime'),
+            temperature: formData.temperature,
             api_key_id: formData.api_key_id,
             call_greeting: formData.call_greeting,
             calendar_account_id: formData.calendar_account_id || null,
             calendar_account_ids: formData.calendar_account_ids,
             calendar_enabled: formData.calendar_enabled,
-            // Hardcoded providers — no user selection
-            asr_provider: 'deepgram',
-            asr_model: 'nova-2',
-            asr_language: 'en',
-            tts_provider: 'piper',
-            tts_model: 'medium',
-            tts_voice: formData.voice,  // voice IS the Piper voice ID
-            llm_provider: 'openai',
-            llm_model: 'gpt-4-turbo',
-            llm_max_tokens: 150,
+            asr_provider: formData.asr_provider,
+            asr_model: formData.asr_model,
+            asr_language: formData.asr_language,
+            tts_provider: formData.tts_provider,
+            tts_model: formData.tts_model,
+            tts_voice: formData.tts_voice,
+            llm_provider: formData.llm_provider,
+            llm_model: formData.llm_model,
+            llm_max_tokens: formData.llm_max_tokens,
             bot_language: formData.bot_language,
-            noise_suppression_level: formData.noise_suppression_level || 'medium',
-            vad_threshold: 0.4,
-            vad_prefix_padding_ms: 300,
-            vad_silence_duration_ms: 500,
-            vad_min_speech_ms: 150,
-            vad_min_silence_ms: 200,
-            tts_speed: 1.0,
-            audio_buffer_size: 200,
-            // Interruption & Streaming — best defaults
-            enable_interruption: true,
-            interruption_probability_threshold: 0.6,
-            interruption_min_chunks: 2,
-            use_streaming_mode: true,
-            // Background Audio — disabled by default
-            background_audio_enabled: false,
-            background_audio_type: 'custom',
-            background_audio_volume: 0.25,
+            noise_suppression_level: formData.noise_suppression_level,
+            vad_threshold: formData.vad_threshold,
+            vad_prefix_padding_ms: formData.vad_prefix_padding_ms,
+            vad_silence_duration_ms: formData.vad_silence_duration_ms,
+            vad_min_speech_ms: formData.vad_min_speech_ms,
+            vad_min_silence_ms: formData.vad_min_silence_ms,
+            tts_speed: formData.tts_speed,
+            audio_buffer_size: formData.audio_buffer_size,
+            // Interruption & Streaming settings
+            enable_interruption: formData.enable_interruption,
+            interruption_probability_threshold: formData.interruption_probability_threshold,
+            interruption_min_chunks: formData.interruption_min_chunks,
+            use_streaming_mode: formData.use_streaming_mode,
+            // Background Audio settings
+            background_audio_enabled: formData.background_audio_enabled,
+            background_audio_type: formData.background_audio_type,
+            background_audio_volume: formData.background_audio_volume,
             // Workflow Integration
             assigned_workflows: selectedWorkflows,
             workflow_trigger_events: workflowTriggerEvents,
@@ -889,41 +964,40 @@ export default function AIAgentPage() {
             name: formData.name,
             system_message: formData.system_message,
             voice: formData.voice,
-            voice_mode: 'custom',
-            temperature: 0.7,
+            voice_mode: formData.voice_mode || (providerMode === 'custom' ? 'custom' : 'realtime'),
+            temperature: formData.temperature,
             api_key_id: formData.api_key_id,
             call_greeting: formData.call_greeting,
             calendar_account_id: formData.calendar_account_id || null,
             calendar_account_ids: formData.calendar_account_ids,
             calendar_enabled: formData.calendar_enabled,
-            // Hardcoded providers — no user selection
-            asr_provider: 'deepgram',
-            asr_model: 'nova-2',
-            asr_language: 'en',
-            tts_provider: 'piper',
-            tts_model: 'medium',
-            tts_voice: formData.voice,  // voice IS the Piper voice ID
-            llm_provider: 'openai',
-            llm_model: 'gpt-4-turbo',
-            llm_max_tokens: 150,
+            asr_provider: formData.asr_provider,
+            asr_model: formData.asr_model,
+            asr_language: formData.asr_language,
+            tts_provider: formData.tts_provider,
+            tts_model: formData.tts_model,
+            tts_voice: formData.tts_voice,
+            llm_provider: formData.llm_provider,
+            llm_model: formData.llm_model,
+            llm_max_tokens: formData.llm_max_tokens,
             bot_language: formData.bot_language,
-            noise_suppression_level: formData.noise_suppression_level || 'medium',
-            vad_threshold: 0.4,
-            vad_prefix_padding_ms: 300,
-            vad_silence_duration_ms: 500,
-            vad_min_speech_ms: 150,
-            vad_min_silence_ms: 200,
-            tts_speed: 1.0,
-            audio_buffer_size: 200,
-            // Interruption & Streaming — best defaults
-            enable_interruption: true,
-            interruption_probability_threshold: 0.6,
-            interruption_min_chunks: 2,
-            use_streaming_mode: true,
-            // Background Audio — disabled by default
-            background_audio_enabled: false,
-            background_audio_type: 'custom',
-            background_audio_volume: 0.25,
+            noise_suppression_level: formData.noise_suppression_level,
+            vad_threshold: formData.vad_threshold,
+            vad_prefix_padding_ms: formData.vad_prefix_padding_ms,
+            vad_silence_duration_ms: formData.vad_silence_duration_ms,
+            vad_min_speech_ms: formData.vad_min_speech_ms,
+            vad_min_silence_ms: formData.vad_min_silence_ms,
+            tts_speed: formData.tts_speed,
+            audio_buffer_size: formData.audio_buffer_size,
+            // Interruption & Streaming settings
+            enable_interruption: formData.enable_interruption,
+            interruption_probability_threshold: formData.interruption_probability_threshold,
+            interruption_min_chunks: formData.interruption_min_chunks,
+            use_streaming_mode: formData.use_streaming_mode,
+            // Background Audio settings
+            background_audio_enabled: formData.background_audio_enabled,
+            background_audio_type: formData.background_audio_type,
+            background_audio_volume: formData.background_audio_volume,
             // Workflow Integration
             assigned_workflows: selectedWorkflows,
             workflow_trigger_events: workflowTriggerEvents,
@@ -971,24 +1045,24 @@ export default function AIAgentPage() {
       setFormData({
         name: '',
         system_message: '',
-        voice: 'en_US-lessac-medium',
-        voice_mode: 'custom',
-        temperature: 0.7,
+        voice: 'alloy',
+        voice_mode: 'realtime',
+        temperature: 0.8,
         api_key_id: '',
         call_greeting: DEFAULT_CALL_GREETING,
         calendar_account_id: '',
         calendar_account_ids: [] as string[],
         calendar_enabled: false,
-        asr_provider: 'deepgram',
-        tts_provider: 'piper',
-        asr_model: 'nova-2',
+        asr_provider: 'openai',
+        tts_provider: 'openai',
+        asr_model: 'whisper-1',
         asr_language: 'en',
-        tts_voice: 'en_US-lessac-medium',
-        tts_model: 'medium',
+        tts_voice: 'alloy',
+        tts_model: 'tts-1',
         tts_speed: 1.0,
         audio_buffer_size: 200,
         llm_provider: 'openai',
-        llm_model: 'gpt-4-turbo',
+        llm_model: 'gpt-4o-mini',
         llm_max_tokens: 150,
         bot_language: 'en',
         noise_suppression_level: 'medium',
@@ -1040,6 +1114,40 @@ export default function AIAgentPage() {
         [name]: nextValue,
       };
     });
+  };
+
+  // Function to sync ElevenLabs voices from user's account
+  const syncElevenLabsVoices = async () => {
+    const resolvedUserId = user?.clientId || user?._id || user?.id;
+    if (!resolvedUserId) {
+      console.warn('Cannot sync voices: user ID not available');
+      return;
+    }
+
+    setIsSyncingVoices(true);
+    try {
+      const voices = await fetchElevenLabsVoices(resolvedUserId);
+      setLiveElevenLabsVoices(voices);
+    } catch (error) {
+      console.error('Failed to sync ElevenLabs voices:', error);
+    } finally {
+      setIsSyncingVoices(false);
+    }
+  };
+
+  // Auto-sync ElevenLabs voices when TTS provider is set to elevenlabs
+  useEffect(() => {
+    if (formData.tts_provider === 'elevenlabs' && !liveElevenLabsVoices && user) {
+      syncElevenLabsVoices();
+    }
+  }, [formData.tts_provider, user]);
+
+  // Get the current TTS voices (use live voices for ElevenLabs if available)
+  const getCurrentTTSVoices = () => {
+    if (formData.tts_provider === 'elevenlabs' && liveElevenLabsVoices) {
+      return liveElevenLabsVoices;
+    }
+    return ENHANCED_TTS_VOICES[formData.tts_provider as keyof typeof ENHANCED_TTS_VOICES] || [];
   };
 
   const handleVoiceDemo = async (voiceId: string) => {
@@ -1294,6 +1402,11 @@ export default function AIAgentPage() {
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
+  const displayProviderLabel = (provider?: SupportedProvider | null) => {
+    if (!provider) return 'Unknown Provider';
+    return PROVIDER_LABELS[provider] || provider;
+  };
+
   const handleViewDocument = async (assistantId: string, file: KnowledgeBaseFile) => {
     setPreviewingDocument(file);
     setIsDocumentPreviewOpen(true);
@@ -1425,30 +1538,31 @@ export default function AIAgentPage() {
     setIsEditMode(false);
     setEditingAssistantId(null);
     setKnowledgeBaseFiles([]);
+    setProviderMode('realtime');
     // Reset workflow state
     setSelectedWorkflows([]);
     setWorkflowTriggerEvents(['CALL_COMPLETED']);
     setFormData({
       name: '',
       system_message: '',
-      voice: 'en_US-lessac-medium',
-      voice_mode: 'custom',
-      temperature: 0.7,
+      voice: 'alloy',
+      voice_mode: 'realtime',
+      temperature: 0.8,
       api_key_id: '',
       call_greeting: DEFAULT_CALL_GREETING,
       calendar_account_id: '',
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
-      asr_provider: 'deepgram',
-      tts_provider: 'piper',
-      asr_model: 'nova-2',
+      asr_provider: 'openai',
+      tts_provider: 'openai',
+      asr_model: 'whisper-1',
       asr_language: 'en',
-      tts_voice: 'en_US-lessac-medium',
-      tts_model: 'medium',
+      tts_voice: 'alloy',
+      tts_model: 'tts-1',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
-      llm_model: 'gpt-4-turbo',
+      llm_model: 'gpt-4o-mini',
       llm_max_tokens: 150,
       bot_language: 'en',
       noise_suppression_level: 'medium',
@@ -1468,18 +1582,31 @@ export default function AIAgentPage() {
   };
 
   const openEditModal = async (assistant: AIAssistant) => {
-    const asr = assistant.asr_provider || 'deepgram';
-    const tts = assistant.tts_provider || 'piper';
+    const asr = assistant.asr_provider || 'openai';
+    const tts = assistant.tts_provider || 'openai';
     const llmProvider = assistant.llm_provider || 'openai';
     const llmModel =
       assistant.llm_model ||
-      (ENHANCED_LLM_MODELS[llmProvider as keyof typeof ENHANCED_LLM_MODELS]?.[0]?.value || 'gpt-4-turbo');
+      (LLM_MODELS[llmProvider as keyof typeof LLM_MODELS]?.[0]?.value || 'gpt-4o-mini');
     const llmMaxTokens = assistant.llm_max_tokens ?? 150;
 
+    // Set provider mode based on stored voice_mode or provider selection
+    const normalizedVoiceMode =
+      assistant.voice_mode === 'custom'
+        ? 'custom'
+        : assistant.voice_mode === 'realtime'
+        ? 'realtime'
+        : undefined;
+    const resolvedVoiceMode =
+      normalizedVoiceMode ||
+      ((asr === 'openai' && tts === 'openai') ? 'realtime' : 'custom');
+
+    setProviderMode(resolvedVoiceMode);
+
     // Set default models/voices based on provider
-    const defaultAsrModel = ASR_MODELS[asr as keyof typeof ASR_MODELS]?.[0]?.value || 'nova-2';
+    const defaultAsrModel = ASR_MODELS[asr as keyof typeof ASR_MODELS]?.[0]?.value || 'whisper-1';
     const defaultTtsVoice = TTS_VOICES[tts as keyof typeof TTS_VOICES]?.[0]?.value || assistant.voice;
-    const defaultTtsModel = TTS_MODELS[tts as keyof typeof TTS_MODELS]?.[0]?.value || 'medium';
+    const defaultTtsModel = TTS_MODELS[tts as keyof typeof TTS_MODELS]?.[0]?.value || 'tts-1';
     const asrModel = assistant.asr_model || defaultAsrModel;
     const asrLanguage = assistant.asr_language || 'en';
     const ttsVoice = assistant.tts_voice || defaultTtsVoice;
@@ -1495,8 +1622,8 @@ export default function AIAgentPage() {
     setFormData({
       name: assistant.name,
       system_message: assistant.system_message,
-      voice: ttsVoice,  // Use the actual Piper voice ID
-      voice_mode: 'custom',
+      voice: assistant.voice,
+      voice_mode: resolvedVoiceMode,
       temperature: assistant.temperature,
       api_key_id: assistant.api_key_id || '',
       call_greeting: assistant.call_greeting || DEFAULT_CALL_GREETING,
@@ -1574,23 +1701,23 @@ export default function AIAgentPage() {
       name: template.name,
       system_message: template.system_message,
       voice: template.voice,
-      voice_mode: 'custom',
+      voice_mode: 'realtime',
       temperature: template.temperature,
       api_key_id: '',
       call_greeting: DEFAULT_CALL_GREETING,
       calendar_account_id: '',
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
-      asr_provider: 'deepgram',
-      tts_provider: 'piper',
-      asr_model: 'nova-2',
+      asr_provider: 'openai',
+      tts_provider: 'openai',
+      asr_model: 'whisper-1',
       asr_language: 'en',
-      tts_voice: template.voice,
-      tts_model: 'medium',
+      tts_voice: 'alloy',
+      tts_model: 'tts-1',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
-      llm_model: 'gpt-4-turbo',
+      llm_model: 'gpt-4o-mini',
       llm_max_tokens: 150,
       bot_language: 'en',
       noise_suppression_level: 'medium',
@@ -1614,24 +1741,24 @@ export default function AIAgentPage() {
     setFormData({
       name: '',
       system_message: '',
-      voice: 'en_US-lessac-medium',
-      voice_mode: 'custom',
-      temperature: 0.7,
+      voice: 'alloy',
+      voice_mode: 'realtime',
+      temperature: 0.8,
       api_key_id: '',
       call_greeting: DEFAULT_CALL_GREETING,
       calendar_account_id: '',
       calendar_account_ids: [] as string[],
       calendar_enabled: false,
-      asr_provider: 'deepgram',
-      tts_provider: 'piper',
-      asr_model: 'nova-2',
+      asr_provider: 'openai',
+      tts_provider: 'openai',
+      asr_model: 'whisper-1',
       asr_language: 'en',
-      tts_voice: 'en_US-lessac-medium',
-      tts_model: 'medium',
+      tts_voice: 'alloy',
+      tts_model: 'tts-1',
       tts_speed: 1.0,
       audio_buffer_size: 200,
       llm_provider: 'openai',
-      llm_model: 'gpt-4-turbo',
+      llm_model: 'gpt-4o-mini',
       llm_max_tokens: 150,
       bot_language: 'en',
       noise_suppression_level: 'medium',
@@ -1723,7 +1850,7 @@ export default function AIAgentPage() {
         name: `${assistant.name} (Copy)`,
         system_message: assistant.system_message,
         voice: assistant.voice,
-        voice_mode: assistant.voice_mode || 'custom',
+        voice_mode: assistant.voice_mode || 'realtime',
         temperature: assistant.temperature,
         call_greeting: assistant.call_greeting,
         asr_provider: assistant.asr_provider,
@@ -2037,116 +2164,222 @@ export default function AIAgentPage() {
 
           {/* Assistants Grid */}
           {!isLoading && !error && assistants.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {assistants.map((assistant) => {
-                const phoneNumbers = getAssistantPhoneNumbers(assistant.id);
-                const hasPhone = phoneNumbers.length > 0;
-                const initials = assistant.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-                const avatarColors = [
-                  'from-blue-500 to-blue-600',
-                  'from-violet-500 to-purple-600',
-                  'from-emerald-500 to-teal-600',
-                  'from-amber-500 to-orange-600',
-                  'from-rose-500 to-pink-600',
-                  'from-cyan-500 to-blue-600',
-                  'from-indigo-500 to-violet-600',
-                ];
-                const colorIndex = assistant.name.charCodeAt(0) % avatarColors.length;
-
-                return (
-                  <div
-                    key={assistant.id}
-                    onClick={() => openViewDetails(assistant)}
-                    className={`group relative cursor-pointer ${isDarkMode ? 'bg-gray-800/70 hover:bg-gray-800' : 'bg-white hover:bg-white'} rounded-2xl transition-all duration-200 border ${isDarkMode ? 'border-gray-700/50 hover:border-gray-600' : 'border-gray-200 hover:border-gray-300'} hover:shadow-lg`}
-                  >
-                    {/* Card Content */}
-                    <div className="p-5">
-                      {/* Header */}
-                      <div className="flex items-start gap-3 mb-3.5">
-                        <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${avatarColors[colorIndex]} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                          <span className="text-white text-[13px] font-bold">{initials}</span>
-                        </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <h3 className={`text-[15px] font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} truncate leading-tight`}>
-                            {assistant.name}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className={`inline-flex items-center gap-1 text-[11px] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${hasPhone ? 'bg-emerald-400' : 'bg-gray-400/40'}`} />
-                              {hasPhone ? `${phoneNumbers.length} number${phoneNumbers.length > 1 ? 's' : ''}` : 'No phone'}
-                            </span>
-                            {assistant.has_knowledge_base && (
-                              <span className={`inline-flex items-center gap-1 text-[11px] ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                {assistant.knowledge_base_files?.length || 0} docs
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {/* Hover actions */}
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleDuplicateAssistant(assistant)}
-                            className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-gray-700 text-gray-600 hover:text-gray-300' : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'} transition-colors`}
-                            title="Duplicate"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                          </button>
-                          <button
-                            onClick={() => openDeleteModal(assistant)}
-                            className={`p-1.5 rounded-lg ${isDarkMode ? 'hover:bg-red-900/30 text-gray-600 hover:text-red-400' : 'hover:bg-red-50 text-gray-400 hover:text-red-500'} transition-colors`}
-                            title="Delete"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* System prompt */}
-                      <p className={`text-[13px] leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} line-clamp-2 min-h-[2.6rem]`}>
-                        {assistant.system_message}
-                      </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {assistants.map((assistant) => (
+                <div
+                  key={assistant.id}
+                  className={`${isDarkMode ? 'bg-gray-800 hover:bg-gray-750' : 'bg-white hover:shadow-lg'} rounded-2xl p-6 shadow-sm transition-all duration-200 cursor-pointer border ${isDarkMode ? 'border-gray-700' : 'border-transparent'}`}
+                >
+                  {/* Assistant Icon */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
                     </div>
-
-                    {/* Action buttons */}
-                    <div className={`flex items-center gap-2 px-5 pb-4`} onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      {/* Duplicate Button */}
                       <button
-                        onClick={() => openEditModal(assistant)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${isDarkMode ? 'bg-gray-700/60 text-gray-300 hover:bg-gray-700 hover:text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
+                        onClick={() => handleDuplicateAssistant(assistant)}
+                        className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-blue-900/20 text-gray-400 hover:text-blue-400' : 'hover:bg-blue-50 text-neutral-mid hover:text-blue-500'} transition-colors`}
+                        title="Duplicate Assistant"
                       >
-                        Edit
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
                       </button>
+                      {/* Delete Button */}
                       <button
-                        onClick={() => setBrowserCallAssistant({ id: assistant.id, name: assistant.name })}
-                        className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/25"
-                        title="Browser voice call"
+                        onClick={() => openDeleteModal(assistant)}
+                        className={`p-2 rounded-lg ${isDarkMode ? 'hover:bg-red-900/20 text-gray-400 hover:text-red-400' : 'hover:bg-red-50 text-neutral-mid hover:text-red-500'} transition-colors`}
+                        title="Delete Assistant"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                        Call
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
                       </button>
-                      {hasPhone && (
-                        <button
-                          onClick={() => openTestCallModal(assistant.id)}
-                          disabled={makingTestCall === assistant.id}
-                          className={`py-2 px-4 rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                            makingTestCall === assistant.id
-                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              : `${isDarkMode ? 'bg-gray-700/60 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
-                          }`}
-                          title="Test call via phone"
-                        >
-                          {makingTestCall === assistant.id ? (
-                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                          )}
-                          Test
-                        </button>
-                      )}
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Assistant Info */}
+                  <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-2`}>
+                    {assistant.name}
+                  </h3>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mb-3 line-clamp-2`}>
+                    {assistant.system_message}
+                  </p>
+
+                  {/* Status Badges */}
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {/* API Key Status Badge */}
+                    {assistant.has_api_key ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-500/10 text-green-500 border border-green-500/20">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        API Key Configured
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        No API Key
+                      </span>
+                    )}
+
+                    {/* Voice Mode Badge */}
+                    {(assistant.voice_mode === 'custom' || assistant.asr_provider || assistant.tts_provider) ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-500 border border-purple-500/20" title={`ASR: ${assistant.asr_provider || 'openai'} | LLM: ${assistant.llm_provider || 'openai'} | TTS: ${assistant.tts_provider || 'openai'}`}>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                        </svg>
+                        Custom Providers
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Realtime API
+                      </span>
+                    )}
+
+                    {/* Knowledge Base Badge */}
+                    {assistant.has_knowledge_base && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        {assistant.knowledge_base_files?.length || 0} {assistant.knowledge_base_files?.length === 1 ? 'Doc' : 'Docs'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Provider Details for Custom Mode */}
+                  {(assistant.voice_mode === 'custom' || assistant.asr_provider || assistant.tts_provider) && (
+                    <div className={`mb-3 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} space-y-1`}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">ASR:</span>
+                        <span className="text-purple-500 font-semibold">{(assistant.asr_provider || 'openai').toUpperCase()}</span>
+                        {assistant.asr_model && <span className="text-gray-500">({assistant.asr_model})</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">LLM:</span>
+                        <span className="text-purple-500 font-semibold">{(assistant.llm_provider || 'openai').toUpperCase()}</span>
+                        {assistant.llm_model && <span className="text-gray-500">({assistant.llm_model})</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">TTS:</span>
+                        <span className="text-purple-500 font-semibold">{(assistant.tts_provider || 'openai').toUpperCase()}</span>
+                        {assistant.tts_voice && <span className="text-gray-500">({assistant.tts_voice})</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* API Key Label */}
+                  {assistant.api_key_label && (
+                    <p className={`mb-3 text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                      Using: <span className="font-semibold text-primary">{assistant.api_key_label}</span>
+                      {assistant.api_key_provider ? ` • ${displayProviderLabel(assistant.api_key_provider)}` : ''}
+                    </p>
+                  )}
+
+                  {/* Assistant Details */}
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1">
+                      <svg className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-neutral-mid'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.06m2.828-9.9a9 9 0 012.828 0" />
+                      </svg>
+                      <span className={`${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>{assistant.voice}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <svg className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-neutral-mid'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span className={`${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>Temp: {assistant.temperature}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-neutral-mid/10'}">
+                    <button
+                      onClick={() => openEditModal(assistant)}
+                      className="flex-1 px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-semibold hover:bg-primary/20 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => openViewDetails(assistant)}
+                      className={`flex-1 px-4 py-2 ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-neutral-light text-neutral-dark'} rounded-lg text-sm font-semibold hover:opacity-80 transition-opacity`}
+                    >
+                      View Details
+                    </button>
+                    {/* Browser Call Button - always available */}
+                    <button
+                      onClick={() => setBrowserCallAssistant({ id: assistant.id, name: assistant.name })}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                        isDarkMode
+                          ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-500/20'
+                          : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
+                      }`}
+                      title="Browser voice call (no phone needed)"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                      Call
+                    </button>
+                    {/* Test Call Button - Only show if assistant has assigned phone numbers */}
+                    {getAssistantPhoneNumbers(assistant.id).length > 0 && (
+                      <button
+                        onClick={() => openTestCallModal(assistant.id)}
+                        disabled={makingTestCall === assistant.id}
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5
+                          ${makingTestCall === assistant.id
+                            ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20'}`}
+                        title="Make a test call via phone"
+                      >
+                        {makingTestCall === assistant.id ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                        )}
+                        Test
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Stats Section */}
+          {!isLoading && !error && assistants.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 shadow-sm`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                      {assistants.length}
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                      Total Assistants
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -2461,83 +2694,241 @@ export default function AIAgentPage() {
                   ))}
                 </div>
               </div>
-              {/* Voice Selection - Piper only */}
-              <div>
-                <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-3`}>
-                  Voice
-                </label>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mb-3`}>
-                  Select the Piper voice for your AI assistant.
+
+              {/* Interruption & Response Latency Settings */}
+              <div className={`rounded-xl border ${isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-white border-gray-200'} p-6`}>
+                <h4 className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-4 flex items-center gap-2`}>
+                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Interruption & Response Speed
+                </h4>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mb-4`}>
+                  Configure how quickly the AI responds and handles interruptions when users speak over it.
                 </p>
-                {/* Gender filter */}
-                <div className="flex gap-2 mb-3">
-                  {(['All', 'Female', 'Male', 'Neutral'] as const).map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setVoiceGenderFilter(g)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        voiceGenderFilter === g
-                          ? 'bg-primary text-white'
-                          : isDarkMode
-                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+
+                {/* Enable Interruption Toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                      Enable Interruption
+                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                      AI stops speaking immediately when user starts talking
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, enable_interruption: !formData.enable_interruption })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      formData.enable_interruption ? 'bg-primary' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        formData.enable_interruption ? 'translate-x-6' : ''
                       }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
+                    />
+                  </button>
                 </div>
-                {/* Accent filter */}
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {['All', ...Array.from(new Set(VOICE_OPTIONS.map(v => v.accent)))].map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      onClick={() => setVoiceAccentFilter(a)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        voiceAccentFilter === a
-                          ? 'bg-primary text-white'
-                          : isDarkMode
-                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+
+                {/* Streaming Mode Toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                      Streaming Mode (Low Latency)
+                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                      Send audio sentence-by-sentence for faster first response (~400ms vs ~1500ms)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, use_streaming_mode: !formData.use_streaming_mode })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      formData.use_streaming_mode ? 'bg-primary' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        formData.use_streaming_mode ? 'translate-x-6' : ''
                       }`}
-                    >
-                      {a}
-                    </button>
-                  ))}
+                    />
+                  </button>
                 </div>
-                {/* Voice grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
-                  {filteredVoices.map((voice) => (
-                    <button
-                      key={voice.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, voice: voice.value, tts_voice: voice.value })}
-                      className={`relative p-3 rounded-xl border-2 transition-all text-left ${
-                        formData.voice === voice.value
-                          ? 'border-primary bg-primary/10'
-                          : isDarkMode
-                            ? 'border-gray-700 bg-gray-800 hover:border-gray-600'
-                            : 'border-neutral-light bg-white hover:border-neutral-mid/30'
-                      }`}
-                    >
-                      <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
-                        {voice.label}
+
+                {/* Advanced VAD Settings (collapsible) */}
+                <details className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'}`}>
+                  <summary className="cursor-pointer text-sm font-medium hover:text-primary">
+                    Advanced VAD Settings
+                  </summary>
+                  <div className="mt-4 space-y-4 pl-2 border-l-2 border-primary/30">
+                    {/* VAD Threshold */}
+                    <div>
+                      <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'} mb-1`}>
+                        VAD Sensitivity: {formData.vad_threshold}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.2"
+                        max="0.8"
+                        step="0.05"
+                        value={formData.vad_threshold}
+                        onChange={(e) => setFormData({ ...formData, vad_threshold: parseFloat(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      />
+                      <div className="flex justify-between text-xs mt-1">
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>More Sensitive (0.2)</span>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>Less Sensitive (0.8)</span>
+                      </div>
+                    </div>
+
+                    {/* Min Speech Duration */}
+                    <div>
+                      <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'} mb-1`}>
+                        Min Speech Duration: {formData.vad_min_speech_ms}ms
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="500"
+                        step="25"
+                        value={formData.vad_min_speech_ms}
+                        onChange={(e) => setFormData({ ...formData, vad_min_speech_ms: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      />
+                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mt-1`}>
+                        Minimum speech length to detect (lower = faster but may catch noise)
                       </p>
-                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
-                        {voice.gender} &middot; {voice.accent}
+                    </div>
+
+                    {/* Min Silence Duration */}
+                    <div>
+                      <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'} mb-1`}>
+                        Min Silence Duration: {formData.vad_min_silence_ms}ms
+                      </label>
+                      <input
+                        type="range"
+                        min="100"
+                        max="500"
+                        step="25"
+                        value={formData.vad_min_silence_ms}
+                        onChange={(e) => setFormData({ ...formData, vad_min_silence_ms: parseInt(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      />
+                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mt-1`}>
+                        Silence needed to mark end of speech (lower = faster response)
                       </p>
-                      {formData.voice === voice.value && (
-                        <div className="absolute top-2 right-2">
-                          <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                    </div>
+
+                    {/* Interruption Sensitivity */}
+                    <div>
+                      <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'} mb-1`}>
+                        Interruption Sensitivity: {formData.interruption_probability_threshold}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.4"
+                        max="0.9"
+                        step="0.05"
+                        value={formData.interruption_probability_threshold}
+                        onChange={(e) => setFormData({ ...formData, interruption_probability_threshold: parseFloat(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                      />
+                      <div className="flex justify-between text-xs mt-1">
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>Trigger Easily (0.4)</span>
+                        <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>Require Clear Speech (0.9)</span>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              {/* Background Audio Settings */}
+              <div className={`rounded-xl border ${isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-white border-gray-200'} p-6`}>
+                <h4 className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-4 flex items-center gap-2`}>
+                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                  Background Music
+                </h4>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mb-4`}>
+                  Add subtle background music to your calls for a more natural experience. The AI voice will always be louder than the background.
+                </p>
+
+                {/* Enable Background Audio Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                      Enable Background Music
+                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                      Play background music during calls
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, background_audio_enabled: !formData.background_audio_enabled, background_audio_type: 'custom' })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      formData.background_audio_enabled ? 'bg-primary' : isDarkMode ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        formData.background_audio_enabled ? 'translate-x-6' : ''
+                      }`}
+                    />
+                  </button>
                 </div>
+
+                {/* Volume Slider (only shown when enabled) */}
+                {formData.background_audio_enabled && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-neutral-dark'} mb-2`}>
+                      Volume: {Math.round(formData.background_audio_volume * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="0.5"
+                      step="0.05"
+                      value={formData.background_audio_volume}
+                      onChange={(e) => setFormData({ ...formData, background_audio_volume: parseFloat(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                    />
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>Subtle (5%)</span>
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>Noticeable (50%)</span>
+                    </div>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mt-2`}>
+                      Recommended: 15-25% for natural background without interfering with speech
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-2`}>
+                  Temperature: {formData.temperature}
+                </label>
+                <input
+                  type="range"
+                  name="temperature"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={formData.temperature}
+                  onChange={handleFormChange}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                />
+                <div className="flex justify-between text-xs mt-2">
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>More Focused (0)</span>
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}>More Creative (1)</span>
+                </div>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} mt-2`}>
+                  Controls randomness. Lower values make responses more focused, higher values more creative.
+                </p>
               </div>
 
               {/* Calendar Accounts for Scheduling */}
@@ -2613,6 +3004,774 @@ export default function AIAgentPage() {
                 )}
               </div>
 
+              {/* Voice Provider Configuration */}
+              <div className={`rounded-xl border ${isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-white border-gray-200'} p-6`}>
+                <h3 className={`text-base font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+                  Voice Provider Configuration
+                </h3>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-6`}>
+                  Choose between OpenAI Realtime API or custom ASR/TTS providers for better cost and performance.
+                </p>
+
+                {/* Two Option Cards */}
+                <div className="space-y-3 mb-6">
+                  {/* OpenAI Realtime API Option */}
+                  <div
+                    className={`w-full p-4 rounded-lg border-2 transition-all ${
+                      providerMode === 'realtime'
+                        ? isDarkMode
+                          ? 'border-primary bg-primary/10'
+                          : 'border-primary bg-primary/5'
+                        : isDarkMode
+                        ? 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProviderMode('realtime');
+                        const defaultRealtimeModel = LLM_MODELS['openai-realtime'][0].value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          voice_mode: 'realtime',
+                          asr_provider: 'openai',
+                          tts_provider: 'openai',
+                          llm_provider: 'openai-realtime',
+                          llm_model: defaultRealtimeModel,
+                        }));
+                      }}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Radio Button */}
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                            providerMode === 'realtime'
+                              ? 'border-primary bg-primary'
+                              : isDarkMode
+                              ? 'border-gray-500'
+                              : 'border-gray-300'
+                          }`}>
+                            {providerMode === 'realtime' && (
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-left flex-1">
+                          <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            OpenAI Realtime API
+                          </h4>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Use OpenAI&apos;s all-in-one Realtime API (existing system)
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Realtime Model Selection (only shown when selected) */}
+                    {providerMode === 'realtime' && (
+                      <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+                        <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-2 block`}>
+                          Realtime Model
+                        </label>
+                        <select
+                          name="llm_model"
+                          value={formData.llm_model}
+                          onChange={(e) => {
+                            setFormData({
+                              ...formData,
+                              llm_model: e.target.value
+                            });
+                          }}
+                          className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                        >
+                          {LLM_MODELS['openai-realtime'].map((model) => (
+                            <option key={model.value} value={model.value}>
+                              {model.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex items-center gap-3 mt-2 text-xs">
+                          <span className={`flex items-center gap-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                            Cost: ${LLM_MODELS['openai-realtime'].find(m => m.value === formData.llm_model)?.cost || '0.006'}/1k tokens
+                          </span>
+                          <span className={`flex items-center gap-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                            Latency: {LLM_MODELS['openai-realtime'].find(m => m.value === formData.llm_model)?.latency || '320'}ms
+                          </span>
+                        </div>
+
+                        {/* Voice Selection - Only for OpenAI Realtime API */}
+                        <div className="mt-4 pt-4 border-t" style={{ borderColor: isDarkMode ? '#4b5563' : '#e5e7eb' }}>
+                          <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-3 block font-medium`}>
+                            Agent Voice Selection
+                          </label>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                            Click on a voice to select it, and use the play button to hear a demo
+                          </p>
+
+                          {/* Voice Filters */}
+                          <div className="mb-3 space-y-3">
+                            {/* Gender Filter */}
+                            <div>
+                              <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                                Filter by Gender
+                              </label>
+                              <div className="flex flex-wrap gap-2">
+                                {(['All', 'Male', 'Female', 'Neutral'] as const).map((gender) => (
+                                  <button
+                                    key={gender}
+                                    type="button"
+                                    onClick={() => setVoiceGenderFilter(gender)}
+                                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                                      voiceGenderFilter === gender
+                                        ? 'bg-primary text-white shadow-md'
+                                        : isDarkMode
+                                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                          : 'bg-neutral-light text-neutral-dark hover:bg-neutral-mid/20'
+                                    }`}
+                                  >
+                                    {gender === 'All' ? 'All Genders' : gender}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Accent Filter */}
+                            <div>
+                              <label className={`block text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                                Filter by Accent
+                              </label>
+                              <div className="flex flex-wrap gap-2">
+                                {uniqueAccents.map((accent) => (
+                                  <button
+                                    key={accent}
+                                    type="button"
+                                    onClick={() => setVoiceAccentFilter(accent)}
+                                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                                      voiceAccentFilter === accent
+                                        ? 'bg-primary text-white shadow-md'
+                                        : isDarkMode
+                                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                          : 'bg-neutral-light text-neutral-dark hover:bg-neutral-mid/20'
+                                    }`}
+                                  >
+                                    {accent === 'All' ? 'All Accents' : accent}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Results Count */}
+                            <div className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                              Showing {filteredVoices.length} of {VOICE_OPTIONS.length} voices
+                            </div>
+                          </div>
+
+                          <div className={`rounded-xl border ${isDarkMode ? 'border-gray-600 bg-gray-700/30' : 'border-neutral-mid/20 bg-white'} max-h-[350px] overflow-y-auto`}>
+                            {filteredVoices.length === 0 ? (
+                              <div className={`p-8 text-center ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                                <p className="text-sm">No voices match the selected filters.</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVoiceGenderFilter('All');
+                                    setVoiceAccentFilter('All');
+                                  }}
+                                  className={`mt-3 text-xs px-3 py-1.5 rounded-lg ${
+                                    isDarkMode
+                                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                      : 'bg-neutral-light text-neutral-dark hover:bg-neutral-mid/20'
+                                  }`}
+                                >
+                                  Clear filters
+                                </button>
+                              </div>
+                            ) : (
+                              filteredVoices.map((voice, index) => (
+                              <div
+                                key={voice.value}
+                                className={`flex items-center justify-between p-4 cursor-pointer transition-all ${
+                                  index !== filteredVoices.length - 1 ? (isDarkMode ? 'border-b border-gray-600' : 'border-b border-neutral-mid/10') : ''
+                                } ${
+                                  formData.voice === voice.value
+                                    ? isDarkMode
+                                      ? 'bg-primary/20 hover:bg-primary/25'
+                                      : 'bg-primary/10 hover:bg-primary/15'
+                                    : isDarkMode
+                                      ? 'hover:bg-gray-700/50'
+                                      : 'hover:bg-neutral-mid/5'
+                                }`}
+                                onClick={() => setFormData(prev => ({ ...prev, voice: voice.value }))}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                                    formData.voice === voice.value
+                                      ? 'bg-primary text-white'
+                                      : isDarkMode
+                                        ? 'bg-gray-600 text-gray-200'
+                                        : 'bg-neutral-mid/10 text-neutral-dark'
+                                  }`}>
+                                    {voice.gender === 'Male' ? '👨' : voice.gender === 'Female' ? '👩' : '🧑'}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                                        {voice.label}
+                                      </h4>
+                                      {formData.voice === voice.value && (
+                                        <svg className="w-4 h-4 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                                        {voice.gender}
+                                      </span>
+                                      <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-neutral-mid/60'}`}>•</span>
+                                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'}`}>
+                                        {voice.accent} Accent
+                                      </span>
+                                    </div>
+                                    <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-neutral-mid/80'}`}>
+                                      {voice.description}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVoiceDemo(voice.value);
+                                  }}
+                                  disabled={playingVoice !== null && playingVoice !== voice.value}
+                                  className={`flex-shrink-0 p-2.5 rounded-full transition-all ${
+                                    playingVoice === voice.value
+                                      ? 'bg-primary text-white shadow-lg scale-110'
+                                      : isDarkMode
+                                        ? 'bg-gray-600 text-gray-200 hover:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed'
+                                        : 'bg-neutral-mid/10 text-neutral-dark hover:bg-neutral-mid/20 disabled:opacity-30 disabled:cursor-not-allowed'
+                                  }`}
+                                  title={playingVoice === voice.value ? 'Stop' : 'Play demo'}
+                                >
+                                  {playingVoice === voice.value ? (
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Custom Providers Option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProviderMode('custom');
+                      setFormData((prev) => {
+                        const shouldApplyDefaults = prev.asr_provider === 'openai' && prev.tts_provider === 'openai';
+                        return {
+                          ...prev,
+                          voice_mode: 'custom',
+                          ...(shouldApplyDefaults
+                            ? {
+                                asr_provider: 'deepgram',
+                                asr_model: 'nova-2',
+                                asr_language: 'en',
+                                tts_provider: 'cartesia',
+                                tts_voice: 'sonic',
+                                tts_model: 'sonic-english',
+                                llm_provider: 'openai',
+                                llm_model: 'gpt-4-turbo'
+                              }
+                            : {}),
+                        };
+                      });
+                    }}
+                    className={`w-full p-4 rounded-lg border-2 transition-all ${
+                      providerMode === 'custom'
+                        ? isDarkMode
+                          ? 'border-primary bg-primary/10'
+                          : 'border-primary bg-primary/5'
+                        : isDarkMode
+                        ? 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      {/* Radio Button */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                          providerMode === 'custom'
+                            ? 'border-primary bg-primary'
+                            : isDarkMode
+                            ? 'border-gray-500'
+                            : 'border-gray-300'
+                        }`}>
+                          {providerMode === 'custom' && (
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-left flex-1">
+                        <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          Custom Providers
+                        </h4>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Choose separate ASR and TTS providers for better cost/performance
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Custom Provider Details (only shown when selected) */}
+                  {providerMode === 'custom' && (
+                    <div className={`mt-4`}>
+                      {/* Real-time Cost Display */}
+                      {isCalculatingCost ? (
+                        <div className={`p-3 rounded-lg border ${isDarkMode ? 'bg-gray-800/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#10b981', borderTopColor: 'transparent' }}></div>
+                            <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Calculating cost...</span>
+                          </div>
+                        </div>
+                      ) : estimatedCost ? (
+                        <div className={`p-4 rounded-lg border ${isDarkMode ? 'bg-green-900/10 border-green-700/50' : 'bg-green-50 border-green-300'}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+                                  Estimated Cost per Minute
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                                    {currency === 'USD' ? '$' : '₹'}
+                                    {currency === 'USD'
+                                      ? estimatedCost.total_usd.toFixed(4)
+                                      : estimatedCost.total_inr.toFixed(2)
+                                    }
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCurrency(currency === 'USD' ? 'INR' : 'USD');
+                                    }}
+                                    className={`text-xs px-2 py-1 rounded ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-white hover:bg-gray-100 text-gray-700'} transition-colors font-semibold border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                                    title={`Switch to ${currency === 'USD' ? 'INR' : 'USD'}`}
+                                  >
+                                    {currency === 'USD' ? 'USD' : 'INR'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className={`flex gap-4 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                              <div className="text-center">
+                                <div className="font-medium mb-1">ASR</div>
+                                <div className={`font-bold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {currency === 'USD' ? '$' : '₹'}
+                                  {currency === 'USD'
+                                    ? estimatedCost.asr_cost_usd.toFixed(4)
+                                    : (estimatedCost.asr_cost_usd * 83).toFixed(2)
+                                  }
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="font-medium mb-1">LLM</div>
+                                <div className={`font-bold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {currency === 'USD' ? '$' : '₹'}
+                                  {currency === 'USD'
+                                    ? estimatedCost.llm_cost_usd.toFixed(4)
+                                    : (estimatedCost.llm_cost_usd * 83).toFixed(2)
+                                  }
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="font-medium mb-1">TTS</div>
+                                <div className={`font-bold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {currency === 'USD' ? '$' : '₹'}
+                                  {currency === 'USD'
+                                    ? estimatedCost.tts_cost_usd.toFixed(4)
+                                    : (estimatedCost.tts_cost_usd * 83).toFixed(2)
+                                  }
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="font-medium mb-1">Twilio</div>
+                                <div className={`font-bold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                  {currency === 'USD' ? '$' : '₹'}
+                                  {currency === 'USD'
+                                    ? estimatedCost.twilio_cost_usd.toFixed(4)
+                                    : (estimatedCost.twilio_cost_usd * 83).toFixed(2)
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'} space-y-4`}>
+                        {/* ASR Section */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                            <label className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              Speech-to-Text (ASR)
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Provider
+                              </label>
+                              <select
+                                name="asr_provider"
+                                value={formData.asr_provider}
+                                onChange={(e) => {
+                                  const provider = e.target.value as 'deepgram' | 'openai' | 'sarvam' | 'google' | 'whisper';
+                                  const defaultModel = ASR_MODELS[provider][0].value;
+                                  setFormData({
+                                    ...formData,
+                                    asr_provider: provider,
+                                    asr_model: defaultModel
+                                  });
+                                }}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                <option value="deepgram">Deepgram Nova</option>
+                                <option value="openai">OpenAI Whisper</option>
+                                <option value="sarvam">Sarvam AI (Indian Languages)</option>
+                                <option value="google">Google Speech-to-Text</option>
+                                <option value="whisper">Whisper (Offline/Local - Free)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Model
+                              </label>
+                              <select
+                                name="asr_model"
+                                value={formData.asr_model}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                {ASR_MODELS[formData.asr_provider as keyof typeof ASR_MODELS]?.map((model) => (
+                                  <option key={model.value} value={model.value}>
+                                    {model.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Language
+                              </label>
+                              <select
+                                name="asr_language"
+                                value={formData.asr_language}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                {ASR_LANGUAGES.map((lang) => (
+                                  <option key={lang.value} value={lang.value}>
+                                    {lang.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 mt-2 text-xs">
+                            <span className="flex items-center gap-1 text-yellow-600">
+                              Cost: ${ASR_MODELS[formData.asr_provider as keyof typeof ASR_MODELS]?.find(m => m.value === formData.asr_model)?.cost || '0.006'}/min
+                            </span>
+                            <span className="flex items-center gap-1 text-green-600">
+                              Latency: {ASR_MODELS[formData.asr_provider as keyof typeof ASR_MODELS]?.find(m => m.value === formData.asr_model)?.latency || '250'}ms
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* TTS Section */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                            </svg>
+                            <label className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              Text-to-Speech (TTS)
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Provider
+                              </label>
+                              <select
+                                name="tts_provider"
+                                value={formData.tts_provider}
+                                onChange={(e) => {
+                                  const provider = e.target.value as 'cartesia' | 'elevenlabs' | 'openai' | 'sarvam' | 'piper';
+                                  const defaultVoice = TTS_VOICES[provider][0].value;
+                                  const defaultModel = TTS_MODELS[provider][0].value;
+                                  setFormData({
+                                    ...formData,
+                                    tts_provider: provider,
+                                    tts_voice: defaultVoice,
+                                    tts_model: defaultModel
+                                  });
+                                  // Reset live voices when switching providers
+                                  if (provider !== 'elevenlabs') {
+                                    setLiveElevenLabsVoices(null);
+                                  }
+                                }}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                <option value="cartesia">Cartesia Sonic</option>
+                                <option value="elevenlabs">ElevenLabs</option>
+                                <option value="openai">OpenAI TTS</option>
+                                <option value="sarvam">Sarvam AI (Indian Voices)</option>
+                                <option value="piper">Piper (Offline/Local - Free)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  Voice
+                                </label>
+                                {formData.tts_provider === 'elevenlabs' && (
+                                  <button
+                                    type="button"
+                                    onClick={syncElevenLabsVoices}
+                                    disabled={isSyncingVoices}
+                                    className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-purple-100 hover:bg-purple-200 text-purple-700'} transition-colors flex items-center gap-1`}
+                                    title="Sync voices from your ElevenLabs account"
+                                  >
+                                    {isSyncingVoices ? (
+                                      <>
+                                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Syncing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        🔄 Sync Voices
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              <select
+                                name="tts_voice"
+                                value={formData.tts_voice}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                {getCurrentTTSVoices().map((voice) => (
+                                  <option key={voice.value} value={voice.value}>
+                                    {voice.label}
+                                  </option>
+                                ))}
+                              </select>
+                              {formData.tts_provider === 'elevenlabs' && liveElevenLabsVoices && (
+                                <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                                  ✓ {liveElevenLabsVoices.length} voices synced from your account
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Model
+                              </label>
+                              <select
+                                name="tts_model"
+                                value={formData.tts_model}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                {TTS_MODELS[formData.tts_provider as keyof typeof TTS_MODELS]?.map((model) => (
+                                  <option key={model.value} value={model.value}>
+                                    {model.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 mt-2 text-xs">
+                            <span className="flex items-center gap-1 text-yellow-600">
+                              Cost: ${TTS_MODELS[formData.tts_provider as keyof typeof TTS_MODELS]?.find(m => m.value === formData.tts_model)?.cost || '0.015'}/min
+                            </span>
+                            <span className="flex items-center gap-1 text-green-600">
+                              Latency: {TTS_MODELS[formData.tts_provider as keyof typeof TTS_MODELS]?.find(m => m.value === formData.tts_model)?.latency || '250'}ms
+                            </span>
+                          </div>
+
+                          {/* Buffer Size & Speed Rate Controls */}
+                          <div className="grid grid-cols-2 gap-4 mt-4">
+                            {/* Buffer Size Slider */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  Buffer Size
+                                </label>
+                                <span className={`text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {formData.audio_buffer_size || 200}ms
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                name="audio_buffer_size"
+                                min="50"
+                                max="1000"
+                                step="50"
+                                value={formData.audio_buffer_size || 200}
+                                onChange={handleFormChange}
+                                className="w-full h-2 bg-purple-500/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                                Lower = faster response, higher = better accuracy
+                              </p>
+                            </div>
+
+                            {/* Speed Rate Slider */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  Speed Rate
+                                </label>
+                                <span className={`text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {formData.tts_speed || 1.0}x
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                name="tts_speed"
+                                min="0.25"
+                                max="4.0"
+                                step="0.05"
+                                value={formData.tts_speed || 1.0}
+                                onChange={handleFormChange}
+                                className="w-full h-2 bg-purple-500/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                                Adjust how fast or slow the agent speaks
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* LLM Section */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <label className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              Language Model (LLM)
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Provider
+                              </label>
+                              <select
+                                name="llm_provider"
+                                value={formData.llm_provider}
+                                onChange={(e) => {
+                                  const provider = e.target.value as 'openai' | 'ollama';
+                                  const models = LLM_MODELS[provider as keyof typeof LLM_MODELS];
+                                  const defaultModel = models?.[0]?.value || 'gpt-4o-mini';
+                                  setFormData({
+                                    ...formData,
+                                    llm_provider: provider,
+                                    llm_model: defaultModel
+                                  });
+                                }}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                <option value="openai">OpenAI GPT</option>
+                                <option value="ollama">Local LLM (Ollama)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Model
+                              </label>
+                              <select
+                                name="llm_model"
+                                value={formData.llm_model}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                {LLM_MODELS[formData.llm_provider as keyof typeof LLM_MODELS]?.map((model) => (
+                                  <option key={model.value} value={model.value}>
+                                    {model.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-1 block`}>
+                                Max Tokens
+                              </label>
+                              <input
+                                type="number"
+                                name="llm_max_tokens"
+                                min={50}
+                                max={4000}
+                                step={50}
+                                value={formData.llm_max_tokens}
+                                onChange={handleFormChange}
+                                className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              />
+                            </div>
+                          </div>
+                          <div className={`mt-3 p-3 rounded-lg border ${isDarkMode ? 'bg-blue-900/10 border-blue-700/30' : 'bg-blue-50 border-blue-200'}`}>
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-4">
+                                {(() => {
+                                  const selectedModel = LLM_MODELS[formData.llm_provider as keyof typeof LLM_MODELS]?.find(m => m.value === formData.llm_model);
+                                  const costDisplay = selectedModel?.cost === 'Free' ? 'Free (Local)' : `$${selectedModel?.cost || '0.001'}/1K tokens`;
+                                  return (
+                                    <>
+                                      <span className={`flex items-center gap-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} font-semibold`}>
+                                        {selectedModel?.cost === 'Free' ? '🆓' : '💰'} Cost: {costDisplay}
+                                      </span>
+                                      <span className={`flex items-center gap-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'} font-semibold`}>
+                                        ⚡ Speed: {selectedModel?.speed || 'Fast'}
+                                      </span>
+                                      <span className={`flex items-center gap-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'} font-semibold`}>
+                                        ⏱️ {selectedModel?.latency || '500'}ms
+                                      </span>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Knowledge Base */}
               <div className={`rounded-xl border ${isDarkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200'} p-6`}>
@@ -3099,7 +4258,7 @@ export default function AIAgentPage() {
                 </button>
                 <button
                   onClick={handleCreateAssistant}
-                  disabled={isCreating || isLoadingKeys || (!isEditMode && !formData.api_key_id && apiKeys.length === 0)}
+                  disabled={isCreating || isLoadingKeys || (providerMode === 'custom' && !isEditMode && !formData.api_key_id && apiKeys.length === 0)}
                   className="px-6 py-3 bg-gradient-to-r from-primary to-primary/90 text-white rounded-xl font-semibold hover:shadow-xl hover:shadow-primary/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isCreating ? (
@@ -3386,6 +4545,40 @@ export default function AIAgentPage() {
 
               {/* Configuration Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* API Key Status */}
+                <div>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-2`}>
+                    API Key Status
+                  </label>
+                  <div className={`flex items-center gap-3 p-4 rounded-xl ${isDarkMode ? 'bg-gray-900' : 'bg-neutral-light'}`}>
+                    {viewingAssistant.has_api_key ? (
+                      <>
+                        <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className={`font-semibold text-green-500`}>
+                          Configured
+                        </span>
+                        {viewingAssistant.api_key_label && (
+                          <span className={`${isDarkMode ? 'text-gray-400' : 'text-neutral-mid'} text-xs`}>
+                            • {viewingAssistant.api_key_label}
+                            {viewingAssistant.api_key_provider ? ` (${displayProviderLabel(viewingAssistant.api_key_provider)})` : ''}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className={`font-semibold text-red-500`}>
+                          Not Configured
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* Calendar Integration */}
                 <div>
                   <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-2`}>
@@ -3430,6 +4623,21 @@ export default function AIAgentPage() {
                     </svg>
                     <span className={`font-semibold capitalize ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
                       {viewingAssistant.voice}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Temperature */}
+                <div>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-neutral-dark'} mb-2`}>
+                    Temperature
+                  </label>
+                  <div className={`flex items-center gap-3 p-4 rounded-xl ${isDarkMode ? 'bg-gray-900' : 'bg-neutral-light'}`}>
+                    <svg className={`w-5 h-5 ${isDarkMode ? 'text-primary' : 'text-primary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-neutral-dark'}`}>
+                      {viewingAssistant.temperature}
                     </span>
                   </div>
                 </div>

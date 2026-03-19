@@ -132,16 +132,19 @@ def assistant_has_api_key(assistant: dict) -> bool:
     import os
     
     # Get providers used by this assistant
-    asr_provider = assistant.get('asr_provider', 'deepgram').lower()
-    tts_provider = assistant.get('tts_provider', 'elevenlabs').lower()
+    asr_provider = assistant.get('asr_provider', 'openai').lower()
+    tts_provider = assistant.get('tts_provider', 'openai').lower()
     llm_provider = assistant.get('llm_provider', 'openai').lower()
-
-    # voice_mode is always 'custom'
-    voice_mode = assistant.get('voice_mode', 'custom').lower()
+    
+    # Check for 'openai-realtime' in voice_mode (uses OpenAI API key)
+    voice_mode = assistant.get('voice_mode', 'realtime').lower()
+    if voice_mode == 'realtime' or 'realtime' in llm_provider:
+        llm_provider = 'openai'  # Realtime API uses OpenAI key
     
     # Map providers to environment variables
     env_var_map = {
         'openai': 'OPENAI_API_KEY',
+        'openai-realtime': 'OPENAI_API_KEY',
         'deepgram': 'DEEPGRAM_API_KEY',
         'sarvam': 'SARVAM_API_KEY',
         'google': 'GOOGLE_API_KEY',
@@ -164,6 +167,10 @@ def assistant_has_api_key(assistant: dict) -> bool:
     # (for backwards compatibility)
     if assistant.get('api_key_id') or assistant.get('openai_api_key'):
         return True
+    
+    # For realtime mode, OpenAI key is always needed
+    if voice_mode == 'realtime':
+        return bool(os.getenv('OPENAI_API_KEY'))
     
     return False
 
@@ -292,12 +299,12 @@ async def create_assistant(request: Request, assistant_data: AIAssistantCreate):
                         detail=f"Invalid calendar_account_id format: {cal_id}"
                     )
 
-        # Determine requested voice mode (always custom)
-        requested_voice_mode = (assistant_data.voice_mode or "custom").lower()
-        if requested_voice_mode != "custom":
+        # Determine requested voice mode (defaults to realtime)
+        requested_voice_mode = (assistant_data.voice_mode or "realtime").lower()
+        if requested_voice_mode not in ("realtime", "custom"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="voice_mode must be 'custom'"
+                detail="voice_mode must be either 'realtime' or 'custom'"
             )
 
         # Create assistant document
@@ -314,15 +321,15 @@ async def create_assistant(request: Request, assistant_data: AIAssistantCreate):
             "calendar_account_ids": calendar_account_obj_ids,
             "calendar_enabled": assistant_data.calendar_enabled if assistant_data.calendar_enabled is not None else False,
             "last_calendar_used_index": -1,
-            "voice_mode": "custom",
-            "asr_provider": "deepgram",
-            "tts_provider": "elevenlabs",
-            # ASR Configuration — hardcoded
+            "voice_mode": requested_voice_mode,
+            "asr_provider": assistant_data.asr_provider or "openai",
+            "tts_provider": assistant_data.tts_provider or "openai",
+            # ASR Configuration
             "asr_language": assistant_data.asr_language or "en",
-            "asr_model": "nova-2",
+            "asr_model": assistant_data.asr_model,
             "asr_keywords": assistant_data.asr_keywords or [],
-            # TTS Configuration — hardcoded
-            "tts_model": "eleven_flash_v2_5",
+            # TTS Configuration
+            "tts_model": assistant_data.tts_model,
             "tts_voice": assistant_data.tts_voice or assistant_data.voice,
             "tts_speed": assistant_data.tts_speed if assistant_data.tts_speed is not None else 1.0,
             # Transcription & Interruptions
@@ -335,8 +342,8 @@ async def create_assistant(request: Request, assistant_data: AIAssistantCreate):
             # Buffer & Latency Settings
             "audio_buffer_size": assistant_data.audio_buffer_size if assistant_data.audio_buffer_size is not None else 200,
             # LLM Configuration
-            "llm_provider": "openai",
-            "llm_model": "gpt-4-turbo",
+            "llm_provider": assistant_data.llm_provider or "openai",
+            "llm_model": assistant_data.llm_model,
             "llm_max_tokens": assistant_data.llm_max_tokens if assistant_data.llm_max_tokens is not None else 150,
             # Language Configuration
             "bot_language": assistant_data.bot_language or "en",
@@ -522,7 +529,7 @@ async def get_user_assistants(user_id: str):
             asr_provider = assistant.get('asr_provider', 'openai').lower()
             tts_provider = assistant.get('tts_provider', 'openai').lower()
             llm_provider = assistant.get('llm_provider', 'openai').lower()
-            voice_mode = assistant.get('voice_mode', 'custom').lower()
+            voice_mode = assistant.get('voice_mode', 'realtime').lower()
             
             # Check if system API keys are available in environment (deployment mode)
             has_system_key = False
@@ -531,7 +538,8 @@ async def get_user_assistants(user_id: str):
             # Map providers to environment variables
             env_var_map = {
                 'openai': 'OPENAI_API_KEY',
-                        'deepgram': 'DEEPGRAM_API_KEY',
+                'openai-realtime': 'OPENAI_API_KEY',
+                'deepgram': 'DEEPGRAM_API_KEY',
                 'sarvam': 'SARVAM_API_KEY',
                 'cartesia': 'CARTESIA_API_KEY',
                 'elevenlabs': 'ELEVENLABS_API_KEY',
@@ -539,13 +547,19 @@ async def get_user_assistants(user_id: str):
                 'anthropic': 'ANTHROPIC_API_KEY'
             }
             
-            # Check if provider keys are available in environment
-            for provider in [asr_provider, tts_provider, llm_provider]:
-                env_var = env_var_map.get(provider)
-                if env_var and os.getenv(env_var):
+            # Check for OpenAI key first (most common, used by realtime mode)
+            if voice_mode == 'realtime' or 'realtime' in llm_provider:
+                if os.getenv('OPENAI_API_KEY'):
                     has_system_key = True
-                    system_provider = provider
-                    break
+                    system_provider = 'openai'
+            else:
+                # Check custom providers
+                for provider in [asr_provider, tts_provider, llm_provider]:
+                    env_var = env_var_map.get(provider)
+                    if env_var and os.getenv(env_var):
+                        has_system_key = True
+                        system_provider = provider
+                        break
             
             if has_system_key:
                 # System API key from environment (deployment mode)
@@ -600,9 +614,9 @@ async def get_user_assistants(user_id: str):
                 has_knowledge_base=len(kb_files) > 0,
                 calendar_account_id=calendar_metadata.get("id") if calendar_metadata else None,
                 calendar_account_email=calendar_metadata.get("email") if calendar_metadata else None,
-                voice_mode=assistant.get('voice_mode', 'custom'),
-                asr_provider=assistant.get('asr_provider', 'deepgram'),
-                tts_provider=assistant.get('tts_provider', 'elevenlabs'),
+                voice_mode=assistant.get('voice_mode', 'realtime'),
+                asr_provider=assistant.get('asr_provider', 'openai'),
+                tts_provider=assistant.get('tts_provider', 'openai'),
                 # ASR Configuration
                 asr_language=assistant.get('asr_language', 'en'),
                 asr_model=assistant.get('asr_model'),
@@ -733,7 +747,7 @@ async def get_assistant(assistant_id: str):
         asr_provider = assistant.get('asr_provider', 'openai').lower()
         tts_provider = assistant.get('tts_provider', 'openai').lower()
         llm_provider = assistant.get('llm_provider', 'openai').lower()
-        voice_mode = assistant.get('voice_mode', 'custom').lower()
+        voice_mode = assistant.get('voice_mode', 'realtime').lower()
         
         # Check if system API keys are available in environment (deployment mode)
         has_system_key = False
@@ -742,7 +756,8 @@ async def get_assistant(assistant_id: str):
         # Map providers to environment variables
         env_var_map = {
             'openai': 'OPENAI_API_KEY',
-                'deepgram': 'DEEPGRAM_API_KEY',
+            'openai-realtime': 'OPENAI_API_KEY',
+            'deepgram': 'DEEPGRAM_API_KEY',
             'sarvam': 'SARVAM_API_KEY',
             'cartesia': 'CARTESIA_API_KEY',
             'elevenlabs': 'ELEVENLABS_API_KEY',
@@ -750,13 +765,19 @@ async def get_assistant(assistant_id: str):
             'anthropic': 'ANTHROPIC_API_KEY'
         }
         
-        # Check if provider keys are available in environment
-        for provider in [asr_provider, tts_provider, llm_provider]:
-            env_var = env_var_map.get(provider)
-            if env_var and os.getenv(env_var):
+        # Check for OpenAI key first (most common, used by realtime mode)
+        if voice_mode == 'realtime' or 'realtime' in llm_provider:
+            if os.getenv('OPENAI_API_KEY'):
                 has_system_key = True
-                system_provider = provider
-                break
+                system_provider = 'openai'
+        else:
+            # Check custom providers
+            for provider in [asr_provider, tts_provider, llm_provider]:
+                env_var = env_var_map.get(provider)
+                if env_var and os.getenv(env_var):
+                    has_system_key = True
+                    system_provider = provider
+                    break
         
         if has_system_key:
             # System API key from environment (deployment mode)
@@ -810,9 +831,9 @@ async def get_assistant(assistant_id: str):
             calendar_account_ids=[str(obj_id) for obj_id in assistant.get('calendar_account_ids', [])],
             calendar_enabled=assistant.get('calendar_enabled', False),
             last_calendar_used_index=assistant.get('last_calendar_used_index', -1),
-            voice_mode=assistant.get('voice_mode', 'custom'),
-            asr_provider=assistant.get('asr_provider', 'deepgram'),
-            tts_provider=assistant.get('tts_provider', 'elevenlabs'),
+            voice_mode=assistant.get('voice_mode', 'realtime'),
+            asr_provider=assistant.get('asr_provider', 'openai'),
+            tts_provider=assistant.get('tts_provider', 'openai'),
             # ASR Configuration
             asr_language=assistant.get('asr_language', 'en'),
             asr_model=assistant.get('asr_model'),
@@ -913,11 +934,11 @@ async def update_assistant(assistant_id: str, update_data: AIAssistantUpdate):
         update_doc = {"updated_at": datetime.utcnow()}
 
         if update_data.voice_mode is not None:
-            normalized_voice_mode = (update_data.voice_mode or "custom").lower()
-            if normalized_voice_mode != "custom":
+            normalized_voice_mode = (update_data.voice_mode or "realtime").lower()
+            if normalized_voice_mode not in ("realtime", "custom"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="voice_mode must be 'custom'"
+                    detail="voice_mode must be either 'realtime' or 'custom'"
                 )
             update_doc["voice_mode"] = normalized_voice_mode
 
@@ -1127,10 +1148,10 @@ async def update_assistant(assistant_id: str, update_data: AIAssistantUpdate):
         import os
         
         # Get providers used by this assistant
-        asr_provider = updated_assistant.get('asr_provider', 'deepgram').lower()
-        tts_provider = updated_assistant.get('tts_provider', 'elevenlabs').lower()
+        asr_provider = updated_assistant.get('asr_provider', 'openai').lower()
+        tts_provider = updated_assistant.get('tts_provider', 'openai').lower()
         llm_provider = updated_assistant.get('llm_provider', 'openai').lower()
-        voice_mode = updated_assistant.get('voice_mode', 'custom').lower()
+        voice_mode = updated_assistant.get('voice_mode', 'realtime').lower()
         
         # Check if system API keys are available in environment (deployment mode)
         has_system_key = False
@@ -1139,7 +1160,8 @@ async def update_assistant(assistant_id: str, update_data: AIAssistantUpdate):
         # Map providers to environment variables
         env_var_map = {
             'openai': 'OPENAI_API_KEY',
-                'deepgram': 'DEEPGRAM_API_KEY',
+            'openai-realtime': 'OPENAI_API_KEY',
+            'deepgram': 'DEEPGRAM_API_KEY',
             'sarvam': 'SARVAM_API_KEY',
             'cartesia': 'CARTESIA_API_KEY',
             'elevenlabs': 'ELEVENLABS_API_KEY',
@@ -1147,13 +1169,19 @@ async def update_assistant(assistant_id: str, update_data: AIAssistantUpdate):
             'anthropic': 'ANTHROPIC_API_KEY'
         }
         
-        # Check if provider keys are available in environment
-        for provider in [asr_provider, tts_provider, llm_provider]:
-            env_var = env_var_map.get(provider)
-            if env_var and os.getenv(env_var):
+        # Check for OpenAI key first (most common, used by realtime mode)
+        if voice_mode == 'realtime' or 'realtime' in llm_provider:
+            if os.getenv('OPENAI_API_KEY'):
                 has_system_key = True
-                system_provider = provider
-                break
+                system_provider = 'openai'
+        else:
+            # Check custom providers
+            for provider in [asr_provider, tts_provider, llm_provider]:
+                env_var = env_var_map.get(provider)
+                if env_var and os.getenv(env_var):
+                    has_system_key = True
+                    system_provider = provider
+                    break
         
         if has_system_key:
             # System API key from environment (deployment mode)
@@ -1207,9 +1235,9 @@ async def update_assistant(assistant_id: str, update_data: AIAssistantUpdate):
             calendar_account_ids=[str(obj_id) for obj_id in updated_assistant.get('calendar_account_ids', [])],
             calendar_enabled=updated_assistant.get('calendar_enabled', False),
             last_calendar_used_index=updated_assistant.get('last_calendar_used_index', -1),
-            voice_mode=updated_assistant.get('voice_mode', 'custom'),
-            asr_provider=updated_assistant.get('asr_provider', 'deepgram'),
-            tts_provider=updated_assistant.get('tts_provider', 'elevenlabs'),
+            voice_mode=updated_assistant.get('voice_mode', 'realtime'),
+            asr_provider=updated_assistant.get('asr_provider', 'openai'),
+            tts_provider=updated_assistant.get('tts_provider', 'openai'),
             # ASR Configuration
             asr_language=updated_assistant.get('asr_language', 'en'),
             asr_model=updated_assistant.get('asr_model'),

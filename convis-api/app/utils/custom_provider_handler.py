@@ -43,13 +43,13 @@ class CustomProviderHandler:
         self.asr_language = assistant_config.get('asr_language', 'en')
 
         self.llm_provider = assistant_config.get('llm_provider', 'openai')
-        self.llm_model = assistant_config.get('llm_model', 'gpt-4-turbo')
+        self.llm_model = assistant_config.get('llm_model', 'gpt-4o-mini')
         self.llm_max_tokens = assistant_config.get('llm_max_tokens', 150)
-        self.temperature = assistant_config.get('temperature', 0.7)
+        self.temperature = assistant_config.get('temperature', 0.8)
 
-        self.tts_provider = assistant_config.get('tts_provider', 'elevenlabs')
+        self.tts_provider = assistant_config.get('tts_provider', 'openai')
         self.tts_voice = assistant_config.get('tts_voice', 'alloy')
-        self.tts_model = assistant_config.get('tts_model', 'eleven_flash_v2_5')
+        self.tts_model = assistant_config.get('tts_model', 'tts-1')
 
         # Conversation state
         self.conversation_history = []

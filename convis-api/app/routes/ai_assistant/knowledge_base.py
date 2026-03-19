@@ -4,6 +4,7 @@ Knowledge Base endpoints for AI Assistants
 from fastapi import APIRouter, HTTPException, status, UploadFile, File
 from app.models.ai_assistant import FileUploadResponse, KnowledgeBaseFile, DeleteResponse
 from app.config.database import Database
+from app.config.settings import settings
 from app.utils import conversational_rag
 from app.utils.assistant_keys import resolve_assistant_api_key
 from bson import ObjectId
@@ -102,21 +103,27 @@ async def upload_knowledge_base_file(
 
         logger.info(f"File saved to {file_path}")
 
-        # Get OpenAI API key for processing
-        try:
-            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider="openai")
-        except HTTPException as exc:
-            os.remove(file_path)
-            raise exc
+        # Check if we should use local embeddings
+        use_local = settings.embedding_model.lower() == "local"
+
+        # Get OpenAI API key only if not using local embeddings
+        openai_api_key = None
+        if not use_local:
+            try:
+                openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider="openai")
+            except HTTPException as exc:
+                os.remove(file_path)
+                raise exc
 
         # Process document and create embeddings with ChromaDB
-        logger.info(f"Processing document and creating embeddings...")
+        logger.info(f"Processing document and creating embeddings (using {'LOCAL' if use_local else 'OPENAI'} model)...")
         result = conversational_rag.process_document_for_conversation(
             assistant_id=assistant_id,
             file_path=file_path,
             filename=file.filename,
             file_type=file_ext.replace('.', ''),
-            api_key=openai_api_key
+            api_key=openai_api_key,
+            use_local_embeddings=use_local
         )
 
         if not result['success']:

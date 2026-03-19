@@ -182,7 +182,7 @@ class CustomProviderStreamHandler:
         self.tts_provider_name = assistant_config.get('tts_provider', 'openai')
         self.voice = assistant_config.get('voice', 'alloy')
         self.tts_voice = assistant_config.get('tts_voice', self.voice)
-        self.temperature = assistant_config.get('temperature', 0.7)
+        self.temperature = assistant_config.get('temperature', 0.8)
         self.system_message = assistant_config.get('system_message', 'You are a helpful AI assistant.')
 
         # Add language instruction to system message if not English
@@ -324,45 +324,195 @@ class CustomProviderStreamHandler:
             logger.info(f"[CUSTOM]   ├─ TTS: {self.tts_provider_name} (model: {self.tts_model}, voice: {self.tts_voice})")
             logger.info(f"[CUSTOM]   └─ LLM: {self.llm_provider} (model: {self.llm_model})")
 
-            # Initialize Deepgram ASR
-            asr_model = self.asr_model or 'nova-2'
-            asr_api_key = self.provider_keys.get('deepgram') or os.getenv("DEEPGRAM_API_KEY")
-            if not asr_api_key:
-                raise RuntimeError("Deepgram API key is not configured")
+            # Initialize ASR provider
+            logger.info(f"[CUSTOM] 🎤 Initializing ASR provider: {self.asr_provider_name}")
+            # Determine ASR model based on provider and config
+            asr_model = self.asr_model
+            if not asr_model:
+                asr_model = 'nova-2' if self.asr_provider_name == 'deepgram' else 'whisper-1'
+                logger.info(f"[CUSTOM]   └─ No model specified, using default: {asr_model}")
 
-            keywords_str = ",".join(self.asr_keywords) if self.asr_keywords else None
-            self.asr_provider_name = 'deepgram'
-            self.asr_provider = ProviderFactory.create_asr_provider(
-                provider_name='deepgram',
-                api_key=asr_api_key,
-                model=asr_model,
-                language=self.asr_language,
-                keywords=keywords_str
-            )
-            logger.info(f"[CUSTOM] ASR initialized: deepgram/{asr_model}")
+            asr_api_key = self.provider_keys.get(self.asr_provider_name)
+            if self.asr_provider_name == 'openai':
+                asr_api_key = asr_api_key or self.openai_api_key
+            elif self.asr_provider_name == 'deepgram':
+                asr_api_key = asr_api_key or os.getenv("DEEPGRAM_API_KEY")
+            elif self.asr_provider_name == 'sarvam':
+                asr_api_key = asr_api_key or os.getenv("SARVAM_API_KEY")
+            elif self.asr_provider_name == 'google':
+                asr_api_key = asr_api_key or os.getenv("GOOGLE_API_KEY")
 
-            # Initialize ElevenLabs TTS
-            tts_api_key = self.provider_keys.get('elevenlabs') or os.getenv("ELEVENLABS_API_KEY")
-            if not tts_api_key:
-                raise RuntimeError("ElevenLabs API key is not configured")
-            self.tts_provider_name = 'elevenlabs'
-            self.tts_provider = ProviderFactory.create_tts_provider(
-                provider_name='elevenlabs',
-                api_key=tts_api_key,
-                voice=self.tts_voice or self.voice,
-            )
-            logger.info(f"[CUSTOM] TTS initialized: elevenlabs/{self.tts_model or 'eleven_flash_v2_5'} (voice: {self.tts_voice or self.voice})")
+            logger.info(f"[CUSTOM]   └─ API key {'✓ found' if asr_api_key else '✗ missing'}")
 
-            # Initialize OpenAI LLM client
-            import openai
-            openai_key = self.provider_keys.get('openai') or self.openai_api_key or os.getenv("OPENAI_API_KEY")
-            if not openai_key:
-                raise RuntimeError("OpenAI API key is not configured")
-            self.llm_client = openai.AsyncOpenAI(api_key=openai_key)
-            self.llm_provider = "openai"
-            if not self.llm_model:
-                self.llm_model = "gpt-4-turbo"
-            logger.info(f"[CUSTOM] LLM initialized: openai/{self.llm_model}")
+            # Fallback logic for missing API keys
+            if self.asr_provider_name == 'deepgram' and not asr_api_key:
+                logger.warning("[CUSTOM] ⚠️ Deepgram key not configured. Falling back to OpenAI Whisper for ASR.")
+                self.asr_provider_name = 'openai'
+                asr_model = 'whisper-1'
+                asr_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+            elif self.asr_provider_name == 'sarvam' and not asr_api_key:
+                logger.warning("[CUSTOM] ⚠️ Sarvam key not configured. Falling back to OpenAI Whisper for ASR.")
+                self.asr_provider_name = 'openai'
+                asr_model = 'whisper-1'
+                asr_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+            elif self.asr_provider_name == 'google' and not asr_api_key:
+                logger.warning("[CUSTOM] ⚠️ Google key not configured. Falling back to OpenAI Whisper for ASR.")
+                self.asr_provider_name = 'openai'
+                asr_model = 'whisper-1'
+                asr_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+
+            try:
+                logger.info(f"[CUSTOM]   └─ Creating ASR provider instance...")
+
+                # Build keywords string for Deepgram (combine user keywords with defaults)
+                keywords_str = None
+                if self.asr_provider_name == 'deepgram':
+                    if self.asr_keywords:
+                        keywords_str = ",".join(self.asr_keywords)
+                        logger.info(f"[CUSTOM]   └─ ASR keywords configured: {keywords_str}")
+                    else:
+                        logger.info(f"[CUSTOM]   └─ Using default email/domain keywords for Deepgram")
+
+                self.asr_provider = ProviderFactory.create_asr_provider(
+                    provider_name=self.asr_provider_name,
+                    api_key=asr_api_key,
+                    model=asr_model,
+                    language=self.asr_language,
+                    keywords=keywords_str  # Pass keywords for Deepgram boosting
+                )
+                logger.info(f"[CUSTOM] ✅ ASR provider initialized: {self.asr_provider_name}/{asr_model}")
+            except Exception as asr_error:
+                logger.error(f"[CUSTOM] ❌ Failed to initialize ASR provider '{self.asr_provider_name}': {asr_error}", exc_info=True)
+                if self.asr_provider_name != 'openai':
+                    logger.warning("[CUSTOM] ⚠️ Falling back to OpenAI Whisper for ASR")
+                    self.asr_provider_name = 'openai'
+                    self.asr_model = 'whisper-1'
+                    self.asr_provider = ProviderFactory.create_asr_provider(
+                        provider_name='openai',
+                        api_key=self.openai_api_key or os.getenv("OPENAI_API_KEY"),
+                        model='whisper-1',
+                        language=self.asr_language
+                    )
+                    logger.info(f"[CUSTOM] ✅ ASR fallback successful: openai/whisper-1")
+                else:
+                    raise
+
+            # Initialize TTS provider
+            logger.info(f"[CUSTOM] 🔊 Initializing TTS provider: {self.tts_provider_name}")
+            # Determine TTS model based on provider and config
+            tts_model = self.tts_model
+            if not tts_model:
+                tts_model = 'tts-1' if self.tts_provider_name == 'openai' else None
+                if tts_model:
+                    logger.info(f"[CUSTOM]   └─ No model specified, using default: {tts_model}")
+
+            tts_api_key = self.provider_keys.get(self.tts_provider_name)
+            if self.tts_provider_name == 'openai':
+                tts_api_key = tts_api_key or self.openai_api_key
+            elif self.tts_provider_name == 'cartesia':
+                tts_api_key = tts_api_key or os.getenv("CARTESIA_API_KEY")
+            elif self.tts_provider_name == 'elevenlabs':
+                tts_api_key = tts_api_key or os.getenv("ELEVENLABS_API_KEY")
+            elif self.tts_provider_name == 'sarvam':
+                tts_api_key = tts_api_key or os.getenv("SARVAM_API_KEY")
+
+            logger.info(f"[CUSTOM]   └─ API key {'✓ found' if tts_api_key else '✗ missing'}")
+
+            if self.tts_provider_name == 'cartesia' and not tts_api_key:
+                logger.warning("[CUSTOM] ⚠️ Cartesia key not configured. Falling back to OpenAI TTS.")
+                self.tts_provider_name = 'openai'
+                tts_model = 'tts-1'
+                tts_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+            elif self.tts_provider_name == 'elevenlabs' and not tts_api_key:
+                logger.warning("[CUSTOM] ⚠️ ElevenLabs key not configured. Falling back to OpenAI TTS.")
+                self.tts_provider_name = 'openai'
+                tts_model = 'tts-1'
+                tts_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+            elif self.tts_provider_name == 'sarvam' and not tts_api_key:
+                logger.warning("[CUSTOM] ⚠️ Sarvam key not configured. Falling back to OpenAI TTS.")
+                self.tts_provider_name = 'openai'
+                tts_model = 'tts-1'
+                tts_api_key = self.openai_api_key or os.getenv("OPENAI_API_KEY")
+
+            try:
+                logger.info(f"[CUSTOM]   └─ Creating TTS provider instance...")
+                # Prepare kwargs for provider-specific parameters
+                tts_kwargs = {}
+                if self.tts_provider_name == 'sarvam':
+                    # Sarvam needs language parameter
+                    tts_kwargs['language'] = self.language or 'hi-IN'
+                    logger.info(f"[CUSTOM]   └─ Sarvam language: {tts_kwargs['language']}")
+
+                self.tts_provider = ProviderFactory.create_tts_provider(
+                    provider_name=self.tts_provider_name,
+                    api_key=tts_api_key,
+                    voice=self.tts_voice or self.voice,
+                    **tts_kwargs
+                )
+                logger.info(f"[CUSTOM] ✅ TTS provider initialized: {self.tts_provider_name}/{tts_model or 'default'} (voice: {self.tts_voice or self.voice})")
+            except Exception as tts_error:
+                logger.error(f"[CUSTOM] ❌ Failed to initialize TTS provider '{self.tts_provider_name}': {tts_error}", exc_info=True)
+                if self.tts_provider_name != 'openai':
+                    logger.warning("[CUSTOM] ⚠️ Falling back to OpenAI TTS")
+                    self.tts_provider_name = 'openai'
+                    self.tts_model = 'tts-1'
+                    self.tts_provider = ProviderFactory.create_tts_provider(
+                        provider_name='openai',
+                        api_key=self.openai_api_key or os.getenv("OPENAI_API_KEY"),
+                        voice=self.voice
+                    )
+                    logger.info(f"[CUSTOM] ✅ TTS fallback successful: openai/tts-1")
+                else:
+                    raise
+
+            # Initialize LLM client based on provider
+            logger.info(f"[CUSTOM] 🤖 Initializing LLM provider: {self.llm_provider}")
+            llm_initialized = False
+            if self.llm_provider == "openai":
+                try:
+                    import openai
+                    openai_key = self.provider_keys.get('openai') or self.openai_api_key or os.getenv("OPENAI_API_KEY")
+                    logger.info(f"[CUSTOM]   └─ API key {'✓ found' if openai_key else '✗ missing'}")
+                    if not openai_key:
+                        raise RuntimeError("OpenAI API key is not configured")
+                    self.llm_client = openai.AsyncOpenAI(api_key=openai_key)
+                    llm_initialized = True
+                    logger.info(f"[CUSTOM] ✅ LLM initialized: openai/{self.llm_model or 'gpt-4o-mini'}")
+                except Exception as openai_error:
+                    logger.error(f"[CUSTOM] ❌ Failed to initialize OpenAI LLM client: {openai_error}", exc_info=True)
+            elif self.llm_provider == "anthropic":
+                try:
+                    import anthropic
+                    api_key = self.provider_keys.get('anthropic') or os.getenv("ANTHROPIC_API_KEY")
+                    if not api_key:
+                        raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+                    self.llm_client = anthropic.AsyncAnthropic(api_key=api_key)
+                    logger.warning("[CUSTOM] ⚠️ Anthropic client initialized but API responses are not yet supported. Falling back to OpenAI.")
+                except Exception as anthropic_error:
+                    logger.error(f"[CUSTOM] ❌ Failed to initialize Anthropic client: {anthropic_error}", exc_info=True)
+            elif self.llm_provider == "groq":
+                try:
+                    from groq import AsyncGroq
+                    api_key = self.provider_keys.get('groq') or os.getenv("GROQ_API_KEY")
+                    if not api_key:
+                        raise RuntimeError("GROQ_API_KEY is not configured")
+                    self.llm_client = AsyncGroq(api_key=api_key)
+                    logger.warning("[CUSTOM] ⚠️ Groq client initialized but API responses are not yet supported. Falling back to OpenAI.")
+                except Exception as groq_error:
+                    logger.error(f"[CUSTOM] ❌ Failed to initialize Groq client: {groq_error}", exc_info=True)
+
+            if not llm_initialized:
+                logger.warning("[CUSTOM] ⚠️ LLM provider not initialized, falling back to OpenAI")
+                import openai
+                fallback_key = self.provider_keys.get('openai') or self.openai_api_key or os.getenv("OPENAI_API_KEY")
+                if not fallback_key:
+                    raise RuntimeError("No supported LLM provider could be initialized (missing API keys)")
+                self.llm_provider = "openai"
+                self.llm_client = openai.AsyncOpenAI(api_key=fallback_key)
+                if not self.llm_model:
+                    self.llm_model = "gpt-4o-mini"
+                llm_initialized = True
+                logger.info(f"[CUSTOM] ✅ LLM fallback successful: openai/{self.llm_model}")
 
             # Add current date/time context to system message with timezone awareness
             # This ensures the AI always knows the current date for scheduling
@@ -491,7 +641,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             ]
 
             # Determine model to use
-            llm_model = self.llm_model or "gpt-4-turbo"
+            llm_model = self.llm_model or "gpt-4o-mini"
 
             # Use non-streaming for faster warmup (we don't care about the response)
             response = await self.llm_client.chat.completions.create(
@@ -1152,7 +1302,18 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             # Keep last 10 messages to avoid token limits
             messages = self.conversation_history[-10:]
 
-            llm_model = self.llm_model or "gpt-4-turbo"
+            # Determine model to use
+            llm_model = self.llm_model
+            if not llm_model:
+                # Default models based on provider
+                if self.llm_provider == "openai":
+                    llm_model = "gpt-4o-mini"
+                elif self.llm_provider == "anthropic":
+                    llm_model = "claude-3-5-sonnet-20241022"
+                elif self.llm_provider == "groq":
+                    llm_model = "llama-3.3-70b-versatile"
+                else:
+                    llm_model = "gpt-4o-mini"
 
             # Prepare tools if enabled
             tools = None
@@ -1280,7 +1441,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
 
         try:
             messages = self.conversation_history[-10:]
-            llm_model = self.llm_model or "gpt-4-turbo"
+            llm_model = self.llm_model or "gpt-4o-mini"
 
             logger.info(f"[CUSTOM] ⚡ Starting streaming LLM response...")
 
@@ -1428,8 +1589,8 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
         
         try:
             messages = self.conversation_history[-10:]
-            llm_model = self.llm_model or "gpt-4-turbo"
-
+            llm_model = self.llm_model or "gpt-4o-mini"
+            
             response = await self.llm_client.chat.completions.create(
                 model=llm_model,
                 messages=messages,
@@ -2258,7 +2419,7 @@ async def handle_custom_provider_stream(
             "assistant_id": str(assistant["_id"]),
             "system_message": assistant.get("system_message", "You are a helpful AI assistant."),
             "voice": assistant.get("voice", "alloy"),
-            "temperature": assistant.get("temperature", 0.7),
+            "temperature": assistant.get("temperature", 0.8),
             # Use call_greeting if available, otherwise fallback to greeting field
             "greeting": assistant.get("call_greeting") or assistant.get("greeting", "Hello! Thanks for calling. How can I help you today?"),
             "asr_provider": assistant.get("asr_provider", "openai"),

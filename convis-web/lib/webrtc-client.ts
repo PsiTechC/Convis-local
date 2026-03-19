@@ -86,8 +86,8 @@ export class ConvisWebRTCClient {
   private pendingSamples: Int16Array[] = [];
   private pendingSampleCount = 0;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
-  private static readonly BUFFER_FLUSH_MS = 150;           // flush after 150ms if threshold not reached
-  private static readonly BUFFER_MIN_SAMPLES = 3600;       // ~150ms at 24kHz — flush when this much accumulates
+  private static readonly BUFFER_FLUSH_MS = 80;           // flush after 80ms if threshold not reached
+  private static readonly BUFFER_MIN_SAMPLES = 1920;       // ~80ms at 24kHz — flush when this much accumulates
 
   // Keepalive
   private pingInterval: ReturnType<typeof setInterval> | null = null;
@@ -446,14 +446,11 @@ export class ConvisWebRTCClient {
             this.setState('listening');
             this.ws.send(JSON.stringify({ type: 'barge-in' }));
             this.bargeInCount = 0;
+            return;
           }
         } else {
           this.bargeInCount = 0;
         }
-        // Don't send mic audio to server while AI is speaking — laptop speakers
-        // bleed into the mic and browser echo cancellation can't fully remove it,
-        // causing distortion and self-listening loops on the server side.
-        return;
       } else {
         this.bargeInCount = 0;
       }
@@ -470,19 +467,14 @@ export class ConvisWebRTCClient {
         }
       }
 
-      // Downsample from AudioContext rate (e.g. 48kHz) to 16kHz using linear
-      // interpolation — avoids aliasing artifacts that nearest-neighbor causes.
+      // Downsample from AudioContext rate (e.g. 48kHz) to 16kHz for the server
       let audioToSend: Float32Array;
       if (contextRate !== 16000) {
         const ratio = contextRate / 16000;
         const outputLength = Math.floor(inputData.length / ratio);
         audioToSend = new Float32Array(outputLength);
         for (let i = 0; i < outputLength; i++) {
-          const srcIdx = i * ratio;
-          const idx0 = Math.floor(srcIdx);
-          const idx1 = Math.min(idx0 + 1, inputData.length - 1);
-          const frac = srcIdx - idx0;
-          audioToSend[i] = inputData[idx0] * (1 - frac) + inputData[idx1] * frac;
+          audioToSend[i] = inputData[Math.floor(i * ratio)];
         }
       } else {
         audioToSend = inputData;
@@ -583,9 +575,9 @@ export class ConvisWebRTCClient {
 
     const now = this.audioContext.currentTime;
 
-    // On first chunk or after a gap (>150ms silence), add 120ms lead time to absorb jitter
-    if (this.nextPlayTime === 0 || now > this.nextPlayTime + 0.15) {
-      this.nextPlayTime = now + 0.12;
+    // On first chunk or after a gap (>100ms silence), add 60ms lead time to absorb jitter
+    if (this.nextPlayTime === 0 || now > this.nextPlayTime + 0.1) {
+      this.nextPlayTime = now + 0.06;
     }
 
     const startTime = Math.max(now, this.nextPlayTime);

@@ -1,0 +1,18 @@
+Category,Item,Cost/Month,Notes
+AWS Server,g4dn.xlarge (24/7),$384,4 vCPU 16GB RAM T4 GPU
+AWS Server,100GB Storage,$10,Charged even when stopped
+AWS Server,Data Transfer,$5,~50GB outbound
+Phone,Twilio Phone Number,$1,Per number
+Phone,Twilio Calls,Variable,$0.02 per minute
+Optional,Domain + SSL,$1,SSL is free via Certbot
+,,,
+TOTAL (24/7),,~$401,
+TOTAL (12 hrs/day),,~$207,Stop instance at night
+TOTAL (8 hrs/day),,~$143,Work hours only
+TOTAL (stopped),,~$10,Storage only
+,,,
+Replaced Cloud APIs,OpenAI GPT-4,$0,Was $5-50 → Now Ollama
+Replaced Cloud APIs,Deepgram STT,$0,Was $0-20 → Now Whisper
+Replaced Cloud APIs,ElevenLabs TTS,$0,Was $5-22 → Now XTTS
+Replaced Cloud APIs,Redis Cloud,$0,Was $0-15 → Now local
+Replaced Cloud APIs,MongoDB Atlas,$0,Was $0-57 → Now local

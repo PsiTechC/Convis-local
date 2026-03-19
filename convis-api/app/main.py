@@ -49,7 +49,6 @@ from app.routes.integrations.n8n import router as n8n_router
 from app.routes.notifications import router as notifications_router
 from app.routes.webrtc import router as webrtc_router
 from app.routes.call_quality import router as call_quality_router
-from app.routes.ollama import router as ollama_router
 from app.config.database import Database
 from app.config.settings import settings
 from app.services.campaign_scheduler import campaign_scheduler
@@ -226,7 +225,6 @@ app.include_router(webrtc_router, prefix="/api/webrtc", tags=["WebRTC Voice"])
 
 # Call Quality Monitoring
 app.include_router(call_quality_router, prefix="/api/call-quality", tags=["Call Quality"])
-app.include_router(ollama_router, prefix="/api/ollama", tags=["Ollama"])
 
 
 async def transcribe_existing_recordings():

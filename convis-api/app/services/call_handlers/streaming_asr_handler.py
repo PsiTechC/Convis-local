@@ -35,7 +35,7 @@ class StreamingDeepgramASR:
     def __init__(
         self,
         api_key: str,
-        model: str = "nova-2",
+        model: str = "nova-3",
         language: str = "en",
         sample_rate: int = 8000,
         encoding: str = "mulaw",  # Twilio uses mulaw
@@ -240,7 +240,6 @@ class StreamingDeepgramASR:
     
     async def close(self):
         """Close the WebSocket connection"""
-        self.is_connected = False  # Stop send_audio immediately
         if self.ws:
             try:
                 # Send close frame to Deepgram
@@ -248,7 +247,7 @@ class StreamingDeepgramASR:
                 await self.ws.close()
             except:
                 pass
-
+            
         if self.receive_task:
             self.receive_task.cancel()
             try:

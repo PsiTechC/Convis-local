@@ -74,8 +74,8 @@ class ElevenLabsWebSocketTTS:
     def __init__(
         self,
         api_key: str,
-        voice: str = "alloy",
-        model: str = "eleven_flash_v2_5",
+        voice: str = "shimmer",
+        model: str = "eleven_turbo_v2_5",
         output_format: str = "ulaw_8000",
         stability: float = 0.5,
         similarity_boost: float = 0.75,

@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     enable_post_call_ai: bool = True
     enable_auto_retry: bool = True
 
+    # Embedding Configuration
+    embedding_model: str = "local"  # "openai" or "local"
+
     # Campaign scheduler (reduced to 1 second for ultra-fast call progression)
     campaign_dispatch_interval_seconds: int = 1
 

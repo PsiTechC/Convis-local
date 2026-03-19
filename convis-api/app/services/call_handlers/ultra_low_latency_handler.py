@@ -139,12 +139,12 @@ class UltraLowLatencyHandler:
 
         # Configurable settings with defaults
         self.asr_provider = self.config.get("asr_provider", "deepgram")
-        self.asr_model = self.config.get("asr_model", "nova-2")
+        self.asr_model = self.config.get("asr_model", "nova-3")
         self.asr_language = self.config.get("asr_language", "en")
 
         self.llm_provider = self.config.get("llm_provider", "openai")
-        self.llm_model = self.config.get("llm_model", "gpt-4-turbo")
-        self.temperature = self.config.get("temperature", 0.7)
+        self.llm_model = self.config.get("llm_model", "gpt-4o-mini")
+        self.temperature = self.config.get("temperature", 0.8)
         self.llm_max_tokens = self.config.get("llm_max_tokens", 150)
 
         # TTS provider selection
@@ -170,8 +170,8 @@ class UltraLowLatencyHandler:
             self.tts_model = self.tts_model or "bulbul:v2"
             self.tts_voice = self.tts_voice or "manisha"
         else:  # elevenlabs
-            self.tts_model = self.tts_model or "eleven_flash_v2_5"
-            self.tts_voice = self.tts_voice or "alloy"
+            self.tts_model = self.tts_model or "eleven_turbo_v2_5"
+            self.tts_voice = self.tts_voice or "shimmer"
 
         # State
         self.is_running = False
@@ -290,7 +290,7 @@ class UltraLowLatencyHandler:
             import openai
             self.llm_client = openai.AsyncOpenAI(api_key=openai_key)
             self.llm_provider = "openai"
-            self.llm_model = "gpt-4-turbo"
+            self.llm_model = "gpt-4o-mini"
 
     async def _initialize_tts(self):
         """Initialize TTS based on configured provider"""

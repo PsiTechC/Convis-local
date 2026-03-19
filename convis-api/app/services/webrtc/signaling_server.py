@@ -191,7 +191,11 @@ class WebRTCSignalingServer:
                     break
 
                 elif msg_type == "ping":
-                    await session.websocket.send_json({"type": "pong"})
+                    try:
+                        await session.websocket.send_json({"type": "pong"})
+                    except RuntimeError:
+                        # WebSocket disconnected, stop the loop
+                        break
 
                 else:
                     logger.warning(f"[WEBRTC-SIGNALING] Unknown message type: {msg_type}")
@@ -200,8 +204,17 @@ class WebRTCSignalingServer:
                 raise
             except json.JSONDecodeError:
                 logger.warning("[WEBRTC-SIGNALING] Invalid JSON received")
+            except RuntimeError as e:
+                # WebSocket disconnected - stop the loop
+                if "WebSocket is not connected" in str(e):
+                    logger.info(f"[WEBRTC-SIGNALING] WebSocket disconnected: {session.session_id}")
+                    break
+                logger.error(f"[WEBRTC-SIGNALING] Runtime error: {e}")
+                break
             except Exception as e:
                 logger.error(f"[WEBRTC-SIGNALING] Message handling error: {e}")
+                # If we get repeated errors, break the loop to prevent infinite errors
+                break
 
     async def _handle_offer(self, session: WebRTCSession, message: Dict):
         """Handle SDP offer from client"""
@@ -216,10 +229,13 @@ class WebRTCSignalingServer:
         # 4. Handle audio tracks for AI processing
 
         # For now, send acknowledgment
-        await session.websocket.send_json({
-            "type": "offer-received",
-            "sessionId": session.session_id
-        })
+        try:
+            await session.websocket.send_json({
+                "type": "offer-received",
+                "sessionId": session.session_id
+            })
+        except RuntimeError as e:
+            logger.warning(f"[WEBRTC-SIGNALING] Cannot send offer acknowledgment: {e}")
 
     async def _handle_answer(self, session: WebRTCSession, message: Dict):
         """Handle SDP answer (if server sent offer)"""

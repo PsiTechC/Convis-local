@@ -22,8 +22,8 @@ class StreamingLLMHandler:
     def __init__(
         self,
         openai_client,
-        model: str = "gpt-4-turbo",
-        temperature: float = 0.7,
+        model: str = "gpt-4o-mini",
+        temperature: float = 0.8,
         max_tokens: int = 150
     ):
         self.client = openai_client

@@ -5,8 +5,6 @@ import asyncio
 import httpx
 from fastapi import APIRouter, HTTPException, status, Response
 from typing import Optional, List
-import io
-import wave
 from bson import ObjectId
 from datetime import datetime
 import logging
@@ -22,227 +20,596 @@ from app.models.voice import (
 from app.config.database import Database
 from app.utils.encryption import encryption_service
 from app.config.settings import settings
-from app.services.call_handlers.offline_tts_handler import OfflinePiperTTS
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Legacy catalog kept for reference only — not used by any route.
-# VOICE_CATALOG has been replaced by ACTIVE_VOICE_CATALOG (Piper only).
-VOICE_CATALOG: List[VoiceMetadata] = []
-
-
-# Piper-only catalog used by Voice Lab and demo APIs.
-ACTIVE_VOICE_CATALOG: List[VoiceMetadata] = [
-    # American Female
+# Comprehensive voice catalog with all metadata
+VOICE_CATALOG: List[VoiceMetadata] = [
+    # Cartesia Voices
     VoiceMetadata(
-        id="en_US-lessac-medium",
-        name="Lessac",
-        provider="piper",
+        id="f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        name="Katie",
+        provider="cartesia",
         gender="female",
         accent="American",
         language="en",
-        description="American female voice optimized for voice agents - stable and natural",
-        age_group="middle-aged",
-        use_case="Voice Agent",
-        model="medium"
-    ),
-    VoiceMetadata(
-        id="en_US-lessac-high",
-        name="Lessac HQ",
-        provider="piper",
-        gender="female",
-        accent="American",
-        language="en",
-        description="High-quality American female voice for premium voice agent experiences",
-        age_group="middle-aged",
-        use_case="Voice Agent",
-        model="high"
-    ),
-    VoiceMetadata(
-        id="en_US-amy-medium",
-        name="Amy",
-        provider="piper",
-        gender="female",
-        accent="American",
-        language="en",
-        description="Friendly American female voice for warm conversational experiences",
+        description="American Female voice optimized for voice agents - stable and realistic",
         age_group="young",
-        use_case="General Purpose",
-        model="medium"
+        use_case="Voice Agent",
+        model="sonic-english"
     ),
     VoiceMetadata(
-        id="en_US-kathleen-low",
-        name="Kathleen",
-        provider="piper",
+        id="228fca29-3a0a-435c-8728-5cb483251068",
+        name="Kiefer",
+        provider="cartesia",
+        gender="male",
+        accent="American",
+        language="en",
+        description="American Male voice optimized for voice agents - stable and realistic",
+        age_group="young",
+        use_case="Voice Agent",
+        model="sonic-english"
+    ),
+    VoiceMetadata(
+        id="6ccbfb76-1fc6-48f7-b71d-91ac6298247b",
+        name="Tessa",
+        provider="cartesia",
         gender="female",
         accent="American",
         language="en",
-        description="Clear American female voice suitable for customer support and IVR",
-        age_group="middle-aged",
-        use_case="Customer Support",
-        model="low"
+        description="American Female voice with emotive characteristics for expressive conversations",
+        age_group="young",
+        use_case="Emotive Character",
+        model="sonic-english"
     ),
     VoiceMetadata(
-        id="en_US-arctic-medium",
-        name="Arctic",
-        provider="piper",
+        id="c961b81c-a935-4c17-bfb3-ba2239de8c2f",
+        name="Kyle",
+        provider="cartesia",
+        gender="male",
+        accent="American",
+        language="en",
+        description="American Male voice with emotive characteristics for expressive conversations",
+        age_group="young",
+        use_case="Emotive Character",
+        model="sonic-english"
+    ),
+    VoiceMetadata(
+        id="a0e99841-438c-4a64-b679-ae501e7d6091",
+        name="Default Voice (Recommended)",
+        provider="cartesia",
         gender="neutral",
         accent="American",
         language="en",
-        description="Neutral American voice with balanced tone for professional use",
+        description="Cartesia's recommended default voice for general use",
         age_group="middle-aged",
         use_case="General Purpose",
-        model="medium"
+        model="sonic-english"
     ),
-    # American Male
     VoiceMetadata(
-        id="en_US-ryan-medium",
-        name="Ryan",
-        provider="piper",
-        gender="male",
+        id="f9836c6e-a0bd-460e-9d3c-f7299fa60f94",
+        name="Alternative Voice 1",
+        provider="cartesia",
+        gender="neutral",
         accent="American",
         language="en",
-        description="American male voice with a clear, professional tone for voice agents",
-        age_group="young",
-        use_case="Voice Agent",
-        model="medium"
-    ),
-    VoiceMetadata(
-        id="en_US-ryan-high",
-        name="Ryan HQ",
-        provider="piper",
-        gender="male",
-        accent="American",
-        language="en",
-        description="High-quality American male voice for premium agent deployments",
-        age_group="young",
-        use_case="Voice Agent",
-        model="high"
-    ),
-    VoiceMetadata(
-        id="en_US-joe-medium",
-        name="Joe",
-        provider="piper",
-        gender="male",
-        accent="American",
-        language="en",
-        description="Casual American male voice great for conversational AI applications",
-        age_group="middle-aged",
-        use_case="Conversational",
-        model="medium"
-    ),
-    VoiceMetadata(
-        id="en_US-danny-low",
-        name="Danny",
-        provider="piper",
-        gender="male",
-        accent="American",
-        language="en",
-        description="Warm American male voice for customer-facing support scenarios",
-        age_group="young",
-        use_case="Customer Support",
-        model="low"
-    ),
-    VoiceMetadata(
-        id="en_US-kusal-medium",
-        name="Kusal",
-        provider="piper",
-        gender="male",
-        accent="American",
-        language="en",
-        description="Expressive American male voice with emotive characteristics",
-        age_group="young",
-        use_case="Emotive Character",
-        model="medium"
-    ),
-    # British Female
-    VoiceMetadata(
-        id="en_GB-alba-medium",
-        name="Alba",
-        provider="piper",
-        gender="female",
-        accent="British",
-        language="en",
-        description="Polished British female voice for professional conversational experiences",
+        description="Alternative neutral voice option",
         age_group="middle-aged",
         use_case="General Purpose",
-        model="medium"
+        model="sonic-english"
     ),
     VoiceMetadata(
-        id="en_GB-jenny-dioco-medium",
-        name="Jenny",
-        provider="piper",
+        id="a167e0f3-df7e-4d52-a9c3-f949145efdab",
+        name="Customer Support Man",
+        provider="cartesia",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Professional male voice optimized for customer support",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="sonic-english"
+    ),
+
+    # ElevenLabs Voices - Female American
+    VoiceMetadata(
+        id="EXAVITQu4vr4xnSDxMaL",
+        name="Sarah",
+        provider="elevenlabs",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Young American female voice with clear, friendly tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="FGY2WhTYpPnrIDTdsKH5",
+        name="Laura",
+        provider="elevenlabs",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Young American female voice, warm and professional",
+        age_group="young",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="cgSgspJ2msm6clMCkdW9",
+        name="Jessica",
+        provider="elevenlabs",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Young American female voice with energetic delivery",
+        age_group="young",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="XrExE9yKIg1WjnnlVkGX",
+        name="Matilda",
+        provider="elevenlabs",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Middle-aged American female voice with authoritative tone",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="pFZP5JQG7iQjIQuC4Bku",
+        name="Lily",
+        provider="elevenlabs",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Middle-aged female voice with sophisticated tone",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+
+    # ElevenLabs - Female British
+    VoiceMetadata(
+        id="Xb7hH8MSUJpSbSDYk0k2",
+        name="Alice",
+        provider="elevenlabs",
         gender="female",
         accent="British",
         language="en",
-        description="Warm British female voice ideal for customer service and IVR",
-        age_group="young",
-        use_case="Customer Support",
-        model="medium"
+        description="Middle-aged British female voice with refined accent",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
     ),
-    # British Male
     VoiceMetadata(
-        id="en_GB-alan-medium",
-        name="Alan",
-        provider="piper",
+        id="FrzKLwOr0y3qieiphjs2",
+        name="Paula",
+        provider="elevenlabs",
+        gender="female",
+        accent="British",
+        language="en",
+        description="Warm, sophisticated female voice with refined English accent - perfect for luxury branding and corporate narration",
+        age_group="young",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+
+    # ElevenLabs - Male American
+    VoiceMetadata(
+        id="2EiwWnXFnvU5JabPnv8n",
+        name="Clyde",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Middle-aged American male voice with strong, confident tone",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="CwhRBWXzGAHq8TQ4Fs17",
+        name="Roger",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Middle-aged American male voice with calm, reassuring tone",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="TX3LPaxmHKxFdv7VOQHJ",
+        name="Liam",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Young American male voice with dynamic, engaging delivery",
+        age_group="young",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="SOYHLrjzK2X1ezoPC6cr",
+        name="Harry",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Young American male voice with friendly, approachable tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="bIHbv24MWmeRgasZH58o",
+        name="Will",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Young American male voice with clear, professional delivery",
+        age_group="young",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="cjVigY5qzO86Huf0OWal",
+        name="Eric",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Middle-aged American male voice with authoritative presence",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="iP95p4xoKVk53GoZ742B",
+        name="Chris",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Middle-aged American male voice with versatile tone",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="nPczCjzI2devNBz1zQrb",
+        name="Brian",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Middle-aged American male voice with warm, trustworthy tone",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="pqHfZKP75CvOlQylNhV4",
+        name="Bill",
+        provider="elevenlabs",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Older American male voice with experienced, wise tone",
+        age_group="old",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+
+    # ElevenLabs - Male British
+    VoiceMetadata(
+        id="JBFqnCBsd6RMkjVDRZzb",
+        name="George",
+        provider="elevenlabs",
         gender="male",
         accent="British",
         language="en",
-        description="Authoritative British male voice for professional voice agents",
+        description="Middle-aged British male voice with distinguished accent",
         age_group="middle-aged",
-        use_case="Voice Agent",
-        model="medium"
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
     ),
-    # Australian
     VoiceMetadata(
-        id="en_AU-natasha-medium",
-        name="Natasha",
-        provider="piper",
-        gender="female",
+        id="onwK4e9ZLuTAKqWW03F9",
+        name="Daniel",
+        provider="elevenlabs",
+        gender="male",
+        accent="British",
+        language="en",
+        description="Middle-aged British male voice with clear, articulate delivery",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+    VoiceMetadata(
+        id="N2lVS1w4EtoT3dr4eOWO",
+        name="Callum",
+        provider="elevenlabs",
+        gender="male",
+        accent="British",
+        language="en",
+        description="Middle-aged male voice with refined British accent",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="eleven_turbo_v2_5"
+    ),
+
+    # ElevenLabs - Male Australian
+    VoiceMetadata(
+        id="IKne3meq5aSn9XLyUdCD",
+        name="Charlie",
+        provider="elevenlabs",
+        gender="male",
         accent="Australian",
         language="en",
-        description="Australian female voice with a friendly and approachable tone",
+        description="Young Australian male voice with friendly, casual tone",
         age_group="young",
         use_case="General Purpose",
-        model="medium"
+        model="eleven_turbo_v2_5"
     ),
+
+    # ElevenLabs - Neutral
     VoiceMetadata(
-        id="en_AU-sam-medium",
-        name="Sam",
-        provider="piper",
-        gender="male",
-        accent="Australian",
+        id="SAz9YHcvj6GT2YYXdXww",
+        name="River",
+        provider="elevenlabs",
+        gender="neutral",
+        accent="American",
         language="en",
-        description="Australian male voice with a relaxed and clear conversational style",
-        age_group="young",
-        use_case="Conversational",
-        model="medium"
+        description="Middle-aged American neutral voice with balanced, versatile tone",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="eleven_turbo_v2_5"
     ),
-    # Indian
+
+    # ElevenLabs - Indian Hindi Voices
     VoiceMetadata(
-        id="hi_IN-priyamvada-medium",
-        name="Priyamvada",
-        provider="piper",
+        id="broqrJkktxd1CclKTudW",
+        name="Anika",
+        provider="elevenlabs",
         gender="female",
         accent="Indian",
         language="hi",
-        description="Hindi female voice tuned for natural local playback",
+        description="Hindi Customer Care Agent - Professional young female voice for conversational support",
         age_group="young",
-        use_case="Conversational",
-        model="medium"
+        use_case="Customer Support",
+        model="eleven_turbo_v2"
     ),
     VoiceMetadata(
-        id="hi_IN-pratham-medium",
-        name="Pratham",
-        provider="piper",
+        id="ni6cdqyS9wBvic5LPA7M",
+        name="Tara",
+        provider="elevenlabs",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Expressive Conversational Hindi Voice - Casual young female with natural delivery",
+        age_group="young",
+        use_case="Conversational",
+        model="eleven_turbo_v2"
+    ),
+    VoiceMetadata(
+        id="SZfY4K69FwXus87eayHK",
+        name="Nikita",
+        provider="elevenlabs",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Youthful Hindi Voice - Excited, energetic young female for engaging conversations",
+        age_group="young",
+        use_case="Conversational",
+        model="eleven_turbo_v2"
+    ),
+    VoiceMetadata(
+        id="1qEiC6qsybMkmnNdVMbK",
+        name="Monika",
+        provider="elevenlabs",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Hindi Modulated Voice - Professional middle-aged female for narrative and storytelling",
+        age_group="middle-aged",
+        use_case="Narrative",
+        model="eleven_turbo_v2"
+    ),
+    VoiceMetadata(
+        id="KSsyodh37PbfWy29kPtx",
+        name="Kishan",
+        provider="elevenlabs",
         gender="male",
         accent="Indian",
         language="hi",
-        description="Hindi male voice tuned for natural local playback",
+        description="Clear & Confident Hindi Narrator - Pleasant young male for audiobooks and e-learning",
+        age_group="young",
+        use_case="Narrative",
+        model="eleven_turbo_v2"
+    ),
+    VoiceMetadata(
+        id="6MoEUz34rbRrmmyxgRm4",
+        name="Manav",
+        provider="elevenlabs",
+        gender="male",
+        accent="Indian",
+        language="hi",
+        description="Charming, Husky Indian Male Voice - Modulated young male for conversational use",
         age_group="young",
         use_case="Conversational",
-        model="medium"
+        model="eleven_turbo_v2"
+    ),
+
+    # OpenAI Voices
+    VoiceMetadata(
+        id="alloy",
+        name="Alloy",
+        provider="openai",
+        gender="neutral",
+        accent="American",
+        language="en",
+        description="Neutral, balanced voice suitable for all purposes",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="tts-1"
+    ),
+    VoiceMetadata(
+        id="echo",
+        name="Echo",
+        provider="openai",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Male voice with clear, strong delivery",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="tts-1"
+    ),
+    VoiceMetadata(
+        id="fable",
+        name="Fable",
+        provider="openai",
+        gender="male",
+        accent="British",
+        language="en",
+        description="British male voice with narrative quality",
+        age_group="middle-aged",
+        use_case="Storytelling",
+        model="tts-1"
+    ),
+    VoiceMetadata(
+        id="onyx",
+        name="Onyx",
+        provider="openai",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Deep male voice with authoritative presence",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="tts-1"
+    ),
+    VoiceMetadata(
+        id="nova",
+        name="Nova",
+        provider="openai",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Female voice with warm, friendly tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="tts-1"
+    ),
+    VoiceMetadata(
+        id="shimmer",
+        name="Shimmer",
+        provider="openai",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Soft female voice with gentle, soothing quality",
+        age_group="young",
+        use_case="Customer Support",
+        model="tts-1"
+    ),
+
+    # Sarvam AI Voices - Female (Only valid voices supported by Sarvam API)
+    VoiceMetadata(
+        id="anushka",
+        name="Anushka",
+        provider="sarvam",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Female Hindi voice with warm tone (default voice)",
+        age_group="young",
+        use_case="General Purpose",
+        model="bulbul:v2"
+    ),
+    VoiceMetadata(
+        id="manisha",
+        name="Manisha",
+        provider="sarvam",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Female voice for Hindi/English, clear and professional",
+        age_group="young",
+        use_case="Bilingual Support",
+        model="bulbul:v2"
+    ),
+    VoiceMetadata(
+        id="vidya",
+        name="Vidya",
+        provider="sarvam",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Female Hindi voice with professional delivery",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="bulbul:v2"
+    ),
+    VoiceMetadata(
+        id="arya",
+        name="Arya",
+        provider="sarvam",
+        gender="female",
+        accent="Indian",
+        language="hi",
+        description="Female Hindi voice with friendly tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="bulbul:v2"
+    ),
+
+    # Sarvam AI Voices - Male (Only valid voices supported by Sarvam API)
+    VoiceMetadata(
+        id="abhilash",
+        name="Abhilash",
+        provider="sarvam",
+        gender="male",
+        accent="Indian",
+        language="hi",
+        description="Male Hindi voice with professional delivery",
+        age_group="young",
+        use_case="Professional",
+        model="bulbul:v2"
+    ),
+    VoiceMetadata(
+        id="karun",
+        name="Karun",
+        provider="sarvam",
+        gender="male",
+        accent="Indian",
+        language="hi",
+        description="Male Hindi voice with confident tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="bulbul:v2"
+    ),
+    VoiceMetadata(
+        id="hitesh",
+        name="Hitesh",
+        provider="sarvam",
+        gender="male",
+        accent="Indian",
+        language="hi",
+        description="Male voice for Hindi/English, clear and authoritative",
+        age_group="young",
+        use_case="Bilingual Support",
+        model="bulbul:v2"
     ),
 ]
 
@@ -397,30 +764,30 @@ async def get_all_voices(
     include_custom: bool = False
 ):
     """
-    Get all available Piper voices with optional filtering
+    Get all available voices from all TTS providers with optional filtering
 
     Query Parameters:
-    - provider: Filter by TTS provider (currently piper)
+    - provider: Filter by TTS provider (cartesia, elevenlabs, openai, sarvam)
     - gender: Filter by gender (male, female, neutral)
     - accent: Filter by accent (American, British, Indian, Australian)
     - language: Filter by language code (en, hi, etc.)
     - user_id: User ID (required if include_custom=True)
-    - include_custom: Reserved for backward compatibility
+    - include_custom: If True, also fetch custom voices from ElevenLabs account
 
     Returns:
-    - List of available Piper voices with complete metadata
+    - List of all available voices with complete metadata
     """
     try:
-        filtered_voices = ACTIVE_VOICE_CATALOG.copy()
+        filtered_voices = VOICE_CATALOG.copy()
 
-        # Legacy ElevenLabs sync is disabled in Piper-only mode.
-        if include_custom and user_id and provider and provider.lower() == "elevenlabs":
+        # If user wants to include custom ElevenLabs voices
+        if include_custom and user_id and (provider is None or provider.lower() == "elevenlabs"):
             try:
                 db = Database.get_db()
                 api_keys_collection = db['api_keys']
                 user_obj_id = ObjectId(user_id)
 
-                # Legacy code path retained for backward compatibility.
+                # Find ElevenLabs API key
                 api_key_doc = api_keys_collection.find_one({
                     "user_id": user_obj_id,
                     "provider": "custom",
@@ -520,7 +887,7 @@ async def get_user_voice_preferences(user_id: str):
         for saved_voice in saved_voices:
             # Find the voice in catalog
             voice_metadata = next(
-                (v for v in ACTIVE_VOICE_CATALOG if v.id == saved_voice["voice_id"] and v.provider == saved_voice["provider"]),
+                (v for v in VOICE_CATALOG if v.id == saved_voice["voice_id"] and v.provider == saved_voice["provider"]),
                 None
             )
 
@@ -900,33 +1267,12 @@ async def generate_openai_demo(voice_id: str, model: str, text: str, api_key: st
         )
 
 
-async def generate_piper_demo(voice_id: str, text: str) -> bytes:
-    """Generate a Piper demo and return WAV bytes for browser playback."""
-    piper_tts = OfflinePiperTTS(voice=voice_id, for_browser=True)
-    pcm_24k = await piper_tts.synthesize(text)
-    if not pcm_24k:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to synthesize Piper audio"
-        )
-
-    wav_buffer = io.BytesIO()
-    with wave.open(wav_buffer, 'wb') as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(2)
-        wav_file.setframerate(24000)
-        wav_file.writeframes(pcm_24k)
-
-    return wav_buffer.getvalue()
-
-
 # Provider API key name mapping
 PROVIDER_KEY_MAPPING = {
     "openai": "openai",
     "cartesia": "custom",  # Cartesia keys stored as custom
     "elevenlabs": "custom",  # ElevenLabs keys stored as custom
-    "sarvam": "custom",  # Sarvam keys stored as custom
-    "piper": "local"
+    "sarvam": "custom"  # Sarvam keys stored as custom
 }
 
 
@@ -935,7 +1281,7 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
     """
     Generate voice demo for any TTS provider
 
-    Supports: OpenAI, Cartesia, ElevenLabs, Sarvam AI, Piper
+    Supports: OpenAI, Cartesia, ElevenLabs, Sarvam AI
 
     Args:
     - request: Voice demo request with provider, voice_id, and text
@@ -960,24 +1306,13 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
 
         # Try to find voice in catalog for metadata (model info)
         voice_metadata = next(
-            (v for v in ACTIVE_VOICE_CATALOG if v.id == request.voice_id and v.provider == request.provider),
+            (v for v in VOICE_CATALOG if v.id == request.voice_id and v.provider == request.provider),
             None
         )
 
         # For ElevenLabs, voices can be dynamically synced from user's account
         # So we don't require them to be in the catalog - just use the voice_id directly
         # The TTS API will return an error if the voice doesn't exist
-
-        # Piper is local and does not require provider API keys.
-        if request.provider == "piper":
-            audio_content = await generate_piper_demo(request.voice_id, request.text)
-            return Response(
-                content=audio_content,
-                media_type="audio/wav",
-                headers={
-                    "Content-Disposition": f'inline; filename="voice_demo_{request.provider}_{request.voice_id}.wav"'
-                }
-            )
 
         # Determine which API key provider to look for
         provider_key_type = PROVIDER_KEY_MAPPING.get(request.provider, "custom")
@@ -1070,8 +1405,7 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             "openai": "tts-1",
             "cartesia": "sonic-english",
             "elevenlabs": "eleven_turbo_v2_5",
-            "sarvam": "bulbul:v2",
-            "piper": "medium"
+            "sarvam": "bulbul:v2"
         }
 
         # Determine model to use (request model > voice metadata model > default)

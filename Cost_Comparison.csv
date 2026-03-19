@@ -1,0 +1,23 @@
+Component,Before (Cloud APIs),Model Used Before,After (Self-Hosted AWS),Model Used Now,Cost Before (per call),Cost Now (per call)
+AI Brain,OpenAI API,GPT-4o-mini,Ollama (local),Mistral 7B,$0.02,$0.00
+Speech to Text,Deepgram API,Nova-2,faster-whisper (local),Whisper Medium,$0.013,$0.00
+Text to Speech,ElevenLabs API,Eleven Turbo v2.5,Piper TTS (local),en_US-lessac-medium,$0.15,$0.00
+Phone Calls,Twilio,Twilio,Twilio,Twilio,$0.07,$0.07
+Server,None (local PC),-,AWS g4dn.xlarge,-,$0.00,$0.53/hr
+Database,Remote MongoDB,MongoDB 7,Local MongoDB (Docker),MongoDB 7,$0.00,$0.00
+Cache,Redis Cloud,Redis 7,Local Redis (Docker),Redis 7,$0.00,$0.00
+,,,,,,
+COST PER CALL,,,,,$0.25,$0.07
+,,,,,,
+Monthly Estimate,Calls/Month,,Before (Cloud APIs),,After (Self-Hosted),
+,100,,$25,,$407,
+,500,,$125,,$435,
+,1000,,$250,,$470,
+,2000,,$500,,$540,
+,5000,,$1250,,$750,
+,10000,,$2500,,$1100,
+,,,,,,
+Fixed Monthly Cost,,,Before,,After,
+,Server,,$0,,$400,
+,Twilio Number,,$1,,$1,
+,Total Fixed,,$1,,$401,

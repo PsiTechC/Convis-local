@@ -184,12 +184,12 @@ class OptimizedStreamHandler:
                 raise ValueError("Deepgram API key required for streaming ASR")
             self.asr = StreamingDeepgramASR(
                 api_key=deepgram_key,
-                model=self.config.get("asr_model", "nova-2"),
+                model=self.config.get("asr_model", "nova-3"),
                 language=self.config.get("asr_language", "en"),
                 on_transcript=self._on_transcript,
                 on_utterance_end=self._on_utterance_end
             )
-
+        
         # Initialize LLM
         import openai
         llm_provider = self.config.get("llm_provider", "openai").lower()
@@ -197,19 +197,19 @@ class OptimizedStreamHandler:
         if llm_provider == "ollama":
             ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
             llm_client = openai.AsyncOpenAI(base_url=ollama_base_url, api_key="ollama")
-            default_model = "llama3.2"
+            default_model = "llama3.2:3b"
             logger.info(f"[OPTIMIZED] Using Ollama LLM at {ollama_base_url}")
         else:
             openai_key = self.provider_keys.get("openai") or os.getenv("OPENAI_API_KEY")
             if not openai_key:
                 raise ValueError("OpenAI API key required")
             llm_client = openai.AsyncOpenAI(api_key=openai_key)
-            default_model = "gpt-4-turbo"
+            default_model = "gpt-4o-mini"
 
         self.llm = StreamingLLMHandler(
             openai_client=llm_client,
             model=self.config.get("llm_model") or default_model,
-            temperature=self.config.get("temperature", 0.7),
+            temperature=self.config.get("temperature", 0.8),
             max_tokens=self.config.get("llm_max_tokens", 150)
         )
 
@@ -219,7 +219,7 @@ class OptimizedStreamHandler:
 
         # Initialize TTS based on configured provider
         tts_provider = self.config.get("tts_provider", "elevenlabs").lower()
-        tts_voice = self.config.get("tts_voice", "alloy")
+        tts_voice = self.config.get("tts_voice", "shimmer")
         logger.info(f"[OPTIMIZED] 🔊 Initializing TTS provider: {tts_provider}")
 
         if tts_provider == "sarvam":
@@ -256,7 +256,7 @@ class OptimizedStreamHandler:
                 raise ValueError("OpenAI API key required for OpenAI TTS")
             self.tts = StreamingOpenAITTS(
                 client=openai_client,
-                voice=tts_voice or "alloy"
+                voice=tts_voice or "shimmer"
             )
             logger.info(f"[OPTIMIZED] ✅ Using OpenAI TTS (voice: {tts_voice})")
         elif tts_provider == "piper":
@@ -272,14 +272,14 @@ class OptimizedStreamHandler:
             if elevenlabs_key:
                 self.tts = StreamingElevenLabsTTS(
                     api_key=elevenlabs_key,
-                    voice=tts_voice or "alloy",
-                    model="eleven_flash_v2_5",
+                    voice=tts_voice or "shimmer",
+                    model="eleven_turbo_v2_5",
                     output_format="ulaw_8000"  # Twilio requires μ-law 8kHz
                 )
                 logger.info(f"[OPTIMIZED] ✅ Using ElevenLabs TTS (voice: {tts_voice}, format: ulaw_8000)")
             elif openai_client:
                 logger.warning("[OPTIMIZED] ⚠️ No ElevenLabs key, falling back to OpenAI TTS")
-                self.tts = StreamingOpenAITTS(client=openai_client, voice=tts_voice or "alloy")
+                self.tts = StreamingOpenAITTS(client=openai_client, voice=tts_voice or "shimmer")
             else:
                 raise ValueError("No TTS provider available. Set an ElevenLabs or OpenAI API key.")
         
@@ -413,7 +413,7 @@ class OptimizedStreamHandler:
                 deepgram_key = self.provider_keys.get("deepgram") or os.getenv("DEEPGRAM_API_KEY")
                 self.asr = StreamingDeepgramASR(
                     api_key=deepgram_key,
-                    model=self.config.get("asr_model", "nova-2"),
+                    model=self.config.get("asr_model", "nova-3"),
                     language=self.config.get("asr_language", "en"),
                     on_transcript=self._on_transcript,
                     on_utterance_end=self._on_utterance_end
@@ -1116,9 +1116,9 @@ class OptimizedStreamHandler:
             tts_provider = self.config.get("tts_provider", "elevenlabs")
             llm_provider = self.config.get("llm_provider", "openai")
             asr_model = self.config.get("asr_model", "nova-2")
-            tts_model = self.config.get("tts_model", "eleven_flash_v2_5")
-            llm_model = self.config.get("llm_model", "gpt-4-turbo")
-            tts_voice = self.config.get("tts_voice") or self.config.get("voice", "alloy")
+            tts_model = self.config.get("tts_model", "eleven_turbo_v2_5")
+            llm_model = self.config.get("llm_model", "gpt-4o-mini")
+            tts_voice = self.config.get("tts_voice") or self.config.get("voice", "shimmer")
 
             execution_logs = {
                 "call_id": self.call_sid,

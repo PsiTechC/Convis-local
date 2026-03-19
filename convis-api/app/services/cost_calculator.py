@@ -89,8 +89,8 @@ async def calculate_and_store_call_cost(
         else:
             # Custom Provider Pipeline cost
             asr_model = call_log.get("asr_model") or assistant.get("asr_model", "nova-2")
-            llm_model = call_log.get("llm_model") or assistant.get("llm_model", "gpt-4-turbo")
-            tts_model = call_log.get("tts_model") or assistant.get("tts_model", "eleven_flash_v2_5")
+            llm_model = call_log.get("llm_model") or assistant.get("llm_model", "gpt-4o-mini")
+            tts_model = call_log.get("tts_model") or assistant.get("tts_model", "tts-1")
 
             logger.info(f"[COST] Calculating Custom Provider cost for {call_sid}: ASR={asr_provider}/{asr_model}, LLM={llm_provider}/{llm_model}, TTS={tts_provider}/{tts_model}, duration={duration_minutes:.2f}min")
 

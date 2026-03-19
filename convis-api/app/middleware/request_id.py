@@ -15,20 +15,16 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     """Add unique request ID to all requests for tracing"""
     
     async def dispatch(self, request: Request, call_next):
-        # Skip WebSocket requests — BaseHTTPMiddleware breaks WebSocket upgrades
-        if request.scope.get("type") == "websocket":
-            return await call_next(request)
-
         # Generate or get request ID
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-
+        
         # Store in request state for access in routes
         request.state.request_id = request_id
-
+        
         # Add to response headers
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
-
+        
         return response
 
 

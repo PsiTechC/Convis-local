@@ -17,6 +17,10 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+# Local embedding model (lazy loading)
+_local_embedding_model = None
+_embedding_lock = threading.Lock()
+
 # ChromaDB client (lazy initialization to avoid blocking Cloud Run startup)
 CHROMA_DB_PATH = os.path.join(os.path.dirname(__file__), "../../chroma_db")
 _chroma_client = None
@@ -41,13 +45,13 @@ def get_chroma_client():
         try:
             logger.info("[CHROMA] Initializing ChromaDB client (lazy load)...")
             import chromadb
-            from chromadb.config import Settings
 
-            _chroma_client = chromadb.Client(Settings(
-                persist_directory=CHROMA_DB_PATH,
-                anonymized_telemetry=False
-            ))
-            logger.info("[CHROMA] ChromaDB client initialized successfully")
+            # Use PersistentClient for ChromaDB 0.4+ to ensure data persistence
+            _chroma_client = chromadb.PersistentClient(
+                path=CHROMA_DB_PATH,
+                settings=chromadb.Settings(anonymized_telemetry=False)
+            )
+            logger.info(f"[CHROMA] ChromaDB persistent client initialized at {CHROMA_DB_PATH}")
             return _chroma_client
         except Exception as e:
             logger.error(f"[CHROMA] Failed to initialize ChromaDB: {e}")
@@ -268,7 +272,54 @@ def chunk_text_for_conversation(text: str, chunk_size: int = 300, overlap: int =
     return chunks
 
 
-def create_embeddings_batch(texts: List[str], api_key: str) -> List[List[float]]:
+def get_local_embedding_model():
+    """
+    Get local embedding model with lazy initialization.
+    Uses sentence-transformers for local, fast embeddings.
+    """
+    global _local_embedding_model
+
+    if _local_embedding_model is not None:
+        return _local_embedding_model
+
+    with _embedding_lock:
+        if _local_embedding_model is not None:
+            return _local_embedding_model
+
+        try:
+            logger.info("[EMBEDDINGS] Initializing local embedding model (sentence-transformers)...")
+            from sentence_transformers import SentenceTransformer
+
+            # Use a lightweight, fast model optimized for semantic search
+            # all-MiniLM-L6-v2: 384 dimensions, ~23MB, very fast
+            _local_embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("[EMBEDDINGS] Local embedding model loaded successfully")
+            return _local_embedding_model
+        except Exception as e:
+            logger.error(f"[EMBEDDINGS] Failed to load local model: {e}")
+            raise
+
+
+def create_embeddings_local(texts: List[str]) -> List[List[float]]:
+    """Create embeddings using local sentence-transformers model"""
+    try:
+        model = get_local_embedding_model()
+        logger.info(f"[EMBEDDINGS] Creating local embeddings for {len(texts)} texts...")
+
+        # Convert texts to embeddings
+        embeddings = model.encode(texts, convert_to_numpy=True)
+
+        # Convert numpy arrays to lists for ChromaDB
+        embeddings_list = [emb.tolist() for emb in embeddings]
+
+        logger.info(f"[EMBEDDINGS] Successfully created {len(embeddings_list)} local embeddings")
+        return embeddings_list
+    except Exception as e:
+        logger.error(f"[EMBEDDINGS] Error creating local embeddings: {e}")
+        return []
+
+
+def create_embeddings_openai(texts: List[str], api_key: str) -> List[List[float]]:
     """Create embeddings for text chunks using OpenAI (batch processing)"""
     try:
         client = OpenAI(api_key=api_key)
@@ -287,8 +338,30 @@ def create_embeddings_batch(texts: List[str], api_key: str) -> List[List[float]]
 
         return embeddings
     except Exception as e:
-        logger.error(f"Error creating embeddings: {e}")
+        logger.error(f"Error creating OpenAI embeddings: {e}")
         return []
+
+
+def create_embeddings_batch(texts: List[str], api_key: str = None, use_local: bool = True) -> List[List[float]]:
+    """
+    Create embeddings using either local or OpenAI models
+
+    Args:
+        texts: List of texts to embed
+        api_key: OpenAI API key (only required if use_local=False)
+        use_local: Whether to use local embeddings (default: True)
+
+    Returns:
+        List of embeddings
+    """
+    if use_local:
+        logger.info("[EMBEDDINGS] Using LOCAL embeddings (sentence-transformers)")
+        return create_embeddings_local(texts)
+    else:
+        logger.info("[EMBEDDINGS] Using OPENAI embeddings")
+        if not api_key:
+            raise ValueError("API key required for OpenAI embeddings")
+        return create_embeddings_openai(texts, api_key)
 
 
 def process_document_for_conversation(
@@ -296,7 +369,8 @@ def process_document_for_conversation(
     file_path: str,
     filename: str,
     file_type: str,
-    api_key: str
+    api_key: str = None,
+    use_local_embeddings: bool = True
 ) -> Dict[str, Any]:
     """
     Process document and store in ChromaDB for fast conversational retrieval
@@ -306,7 +380,8 @@ def process_document_for_conversation(
         file_path: Path to the file
         filename: Original filename
         file_type: Type of file (pdf, docx, etc.)
-        api_key: OpenAI API key for embeddings
+        api_key: OpenAI API key for embeddings (optional if using local)
+        use_local_embeddings: Whether to use local embeddings (default: True)
 
     Returns:
         Dict with processing results
@@ -326,7 +401,7 @@ def process_document_for_conversation(
 
         # Create embeddings
         chunk_texts = [chunk['text'] for chunk in chunks]
-        embeddings = create_embeddings_batch(chunk_texts, api_key)
+        embeddings = create_embeddings_batch(chunk_texts, api_key=api_key, use_local=use_local_embeddings)
         if not embeddings:
             raise ValueError("Failed to create embeddings")
 
@@ -383,10 +458,11 @@ def process_document_for_conversation(
 async def search_conversation_context(
     assistant_id: str,
     query: str,
-    api_key: str,
+    api_key: str = None,
     top_k: int = 3,
     relevance_threshold: float = 0.7,
-    database_config: Optional[Dict[str, Any]] = None
+    database_config: Optional[Dict[str, Any]] = None,
+    use_local_embeddings: bool = True
 ) -> Optional[str]:
     """
     Search knowledge base and database (if configured) and return conversational context.
@@ -414,13 +490,19 @@ async def search_conversation_context(
             chroma = get_chroma_client()
             collection = chroma.get_collection(name=collection_name)
 
-            # Create query embedding
-            client = OpenAI(api_key=api_key)
-            query_response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=[query]
-            )
-            query_embedding = query_response.data[0].embedding
+            # Create query embedding (use same model as storage)
+            if use_local_embeddings:
+                query_embeddings = create_embeddings_local([query])
+                query_embedding = query_embeddings[0]
+            else:
+                if not api_key:
+                    raise ValueError("API key required for OpenAI embeddings")
+                client = OpenAI(api_key=api_key)
+                query_response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=[query]
+                )
+                query_embedding = query_response.data[0].embedding
 
             # Search ChromaDB
             results = collection.query(

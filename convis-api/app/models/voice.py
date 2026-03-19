@@ -10,7 +10,7 @@ class VoiceMetadata(BaseModel):
     """Metadata for a single voice"""
     id: str = Field(..., description="Unique voice identifier")
     name: str = Field(..., description="Display name of the voice")
-    provider: Literal["piper"] = Field(..., description="TTS provider")
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"] = Field(..., description="TTS provider")
     gender: Literal["male", "female", "neutral"] = Field(..., description="Voice gender")
     accent: str = Field(..., description="Voice accent/region (e.g., American, British, Indian)")
     language: str = Field(default="en", description="Primary language code")
@@ -22,16 +22,16 @@ class VoiceMetadata(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "id": "en_US-lessac-medium",
-                "name": "Lessac",
-                "provider": "piper",
-                "gender": "female",
+                "id": "alloy",
+                "name": "Alloy",
+                "provider": "openai",
+                "gender": "neutral",
                 "accent": "American",
                 "language": "en",
-                "description": "American female voice optimized for local offline synthesis",
+                "description": "Neutral, balanced voice suitable for all purposes",
                 "age_group": "middle-aged",
-                "use_case": "Voice Agent",
-                "model": "medium"
+                "use_case": "General Purpose",
+                "model": "tts-1"
             }
         }
 
@@ -46,8 +46,8 @@ class VoiceListResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "voices": [],
-                "total": 17,
-                "providers": ["piper"]
+                "total": 64,
+                "providers": ["cartesia", "elevenlabs", "openai", "sarvam"]
             }
         }
 
@@ -70,7 +70,7 @@ class UserVoicePreferences(BaseModel):
 class SaveVoiceRequest(BaseModel):
     """Request to save a voice to user's preferences"""
     voice_id: str
-    provider: Literal["piper"]
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"]
     nickname: Optional[str] = None
 
 
@@ -83,7 +83,7 @@ class RemoveVoiceRequest(BaseModel):
 class UniversalVoiceDemoRequest(BaseModel):
     """Request for generating voice demo for any provider"""
     voice_id: str = Field(..., description="Voice identifier")
-    provider: Literal["piper"] = Field(..., description="TTS provider")
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"] = Field(..., description="TTS provider")
     user_id: str = Field(..., description="User ID for API key lookup")
     text: Optional[str] = Field(
         default="This is the text you can play using this voice. Experience the natural tone and clarity.",
