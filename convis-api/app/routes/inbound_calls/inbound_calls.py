@@ -523,13 +523,14 @@ async def handle_media_stream(websocket: WebSocket, assistant_id: str):
 
         logger.info(f"[INBOUND] Voice mode: {voice_mode}")
 
-        # Resolve OpenAI API key - try assistant's key first, then fall back to system env key
+        # Resolve LLM API key - use assistant's configured provider
         openai_api_key = None
         try:
-            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider="openai")
-            logger.info(f"[INBOUND] Using assistant's OpenAI API key")
+            llm_provider = assistant.get('llm_provider', 'openai')
+            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider=llm_provider)
+            logger.info(f"[INBOUND] Using {llm_provider} API key")
         except HTTPException as exc:
-            logger.warning(f"[INBOUND] No assistant API key found: {exc.detail}")
+            logger.warning(f"[INBOUND] No API key found: {exc.detail}")
 
         # Fallback to system OpenAI API key from environment
         if not openai_api_key:

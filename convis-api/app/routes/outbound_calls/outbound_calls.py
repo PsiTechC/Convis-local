@@ -475,7 +475,8 @@ async def make_outbound_call(assistant_id: str, request: OutboundCallRequest):
             )
 
         try:
-            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider="openai")
+            llm_provider = assistant.get('llm_provider', 'openai')
+            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider=llm_provider)
         except HTTPException as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
@@ -665,11 +666,12 @@ async def handle_media_stream(websocket: WebSocket, assistant_id: str):
 
         logger.info(f"[OUTBOUND] Voice mode: {voice_mode}")
 
-        # Resolve OpenAI API key for the assistant (needed for both modes)
+        # Resolve LLM API key for the assistant (needed for both modes)
         try:
-            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider="openai")
+            llm_provider = assistant.get('llm_provider', 'openai')
+            openai_api_key, _ = resolve_assistant_api_key(db, assistant, required_provider=llm_provider)
         except HTTPException as exc:
-            logger.error(f"Failed to resolve OpenAI API key: {exc.detail}")
+            logger.error(f"Failed to resolve LLM API key: {exc.detail}")
             await websocket.close(code=1008, reason=f"API key configuration error: {exc.detail}")
             return
 

@@ -1340,12 +1340,40 @@ async def generate_openai_demo(voice_id: str, model: str, text: str, api_key: st
         )
 
 
+async def generate_piper_demo(voice_id: str, text: str) -> bytes:
+    """Generate voice demo using local Piper TTS"""
+    try:
+        from app.providers.tts import PiperTTS
+        import io
+        import wave
+
+        piper = PiperTTS(voice=voice_id)
+        pcm_audio = await piper.synthesize(text)
+
+        if not pcm_audio:
+            raise Exception("Piper returned empty audio")
+
+        # Convert PCM to WAV
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(8000)
+            wav_file.writeframes(pcm_audio)
+
+        return wav_buffer.getvalue()
+    except Exception as e:
+        logger.error(f"Piper demo generation error: {e}")
+        raise
+
+
 # Provider API key name mapping
 PROVIDER_KEY_MAPPING = {
     "openai": "openai",
     "cartesia": "custom",  # Cartesia keys stored as custom
     "elevenlabs": "custom",  # ElevenLabs keys stored as custom
-    "sarvam": "custom"  # Sarvam keys stored as custom
+    "sarvam": "custom",  # Sarvam keys stored as custom
+    "piper": "local"  # Piper is local, no key needed
 }
 
 
@@ -1443,8 +1471,12 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             if not api_key_doc:
                 logger.info(f"No user API key found for {request.provider}, trying .env fallback")
 
+                # Piper is local - no API key needed
+                if request.provider == "piper":
+                    decrypted_api_key = ""
+                    logger.info("Piper is a local provider, no API key needed")
                 # Try to get API key from environment variables
-                if request.provider == "sarvam":
+                elif request.provider == "sarvam":
                     decrypted_api_key = settings.sarvam_api_key
                 elif request.provider == "cartesia":
                     decrypted_api_key = settings.cartesia_api_key
@@ -1453,7 +1485,7 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
                 elif request.provider == "openai":
                     decrypted_api_key = settings.openai_api_key if hasattr(settings, 'openai_api_key') else None
 
-                if not decrypted_api_key:
+                if decrypted_api_key is None:
                     provider_name = request.provider.capitalize()
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -1503,6 +1535,10 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             audio_content = await generate_sarvam_demo(
                 request.voice_id, model_to_use, request.text, decrypted_api_key
             )
+        elif request.provider == "piper":
+            audio_content = await generate_piper_demo(
+                request.voice_id, request.text
+            )
         else:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -1510,11 +1546,13 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             )
 
         # Return audio as response
+        media_type = "audio/wav" if request.provider == "piper" else "audio/mpeg"
+        file_ext = "wav" if request.provider == "piper" else "mp3"
         return Response(
             content=audio_content,
-            media_type="audio/mpeg",
+            media_type=media_type,
             headers={
-                "Content-Disposition": f'inline; filename="voice_demo_{request.provider}_{request.voice_id}.mp3"'
+                "Content-Disposition": f'inline; filename="voice_demo_{request.provider}_{request.voice_id}.{file_ext}"'
             }
         )
 
