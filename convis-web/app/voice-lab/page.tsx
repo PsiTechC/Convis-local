@@ -22,7 +22,7 @@ type StoredUser = {
 interface Voice {
   id: string;
   name: string;
-  provider: 'cartesia' | 'elevenlabs' | 'openai' | 'sarvam';
+  provider: 'cartesia' | 'elevenlabs' | 'openai' | 'sarvam' | 'piper';
   gender: 'male' | 'female' | 'neutral';
   accent: string;
   language: string;
@@ -77,6 +77,7 @@ export default function VoiceLabPage() {
     elevenlabs: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-300 dark:border-blue-700' },
     openai: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-300 dark:border-green-700' },
     sarvam: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700' },
+    piper: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-700' },
   };
 
   // Gender icons

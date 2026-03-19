@@ -10,7 +10,7 @@ class VoiceMetadata(BaseModel):
     """Metadata for a single voice"""
     id: str = Field(..., description="Unique voice identifier")
     name: str = Field(..., description="Display name of the voice")
-    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"] = Field(..., description="TTS provider")
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam", "piper"] = Field(..., description="TTS provider")
     gender: Literal["male", "female", "neutral"] = Field(..., description="Voice gender")
     accent: str = Field(..., description="Voice accent/region (e.g., American, British, Indian)")
     language: str = Field(default="en", description="Primary language code")
@@ -70,7 +70,7 @@ class UserVoicePreferences(BaseModel):
 class SaveVoiceRequest(BaseModel):
     """Request to save a voice to user's preferences"""
     voice_id: str
-    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"]
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam", "piper"]
     nickname: Optional[str] = None
 
 
@@ -83,7 +83,7 @@ class RemoveVoiceRequest(BaseModel):
 class UniversalVoiceDemoRequest(BaseModel):
     """Request for generating voice demo for any provider"""
     voice_id: str = Field(..., description="Voice identifier")
-    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam"] = Field(..., description="TTS provider")
+    provider: Literal["cartesia", "elevenlabs", "openai", "sarvam", "piper"] = Field(..., description="TTS provider")
     user_id: str = Field(..., description="User ID for API key lookup")
     text: Optional[str] = Field(
         default="This is the text you can play using this voice. Experience the natural tone and clarity.",

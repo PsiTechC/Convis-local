@@ -611,6 +611,79 @@ VOICE_CATALOG: List[VoiceMetadata] = [
         use_case="Bilingual Support",
         model="bulbul:v2"
     ),
+    # Piper Voices (Local/Offline - Free)
+    VoiceMetadata(
+        id="en_US-lessac-medium",
+        name="Lessac",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="American Female voice - clear and natural, optimized for conversations",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-lessac-high",
+        name="Lessac HQ",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="American Female voice - high quality, best for important calls",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="high"
+    ),
+    VoiceMetadata(
+        id="en_US-amy-medium",
+        name="Amy",
+        provider="piper",
+        gender="female",
+        accent="American",
+        language="en",
+        description="American Female voice - warm and friendly tone",
+        age_group="young",
+        use_case="Customer Support",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-ryan-medium",
+        name="Ryan",
+        provider="piper",
+        gender="male",
+        accent="American",
+        language="en",
+        description="American Male voice - professional and clear",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_GB-alba-medium",
+        name="Alba",
+        provider="piper",
+        gender="female",
+        accent="British",
+        language="en",
+        description="British Female voice - elegant and professional",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
+    VoiceMetadata(
+        id="en_US-libritts_r-medium",
+        name="LibriTTS",
+        provider="piper",
+        gender="neutral",
+        accent="American",
+        language="en",
+        description="American neutral voice - balanced and clear",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="medium"
+    ),
 ]
 
 
