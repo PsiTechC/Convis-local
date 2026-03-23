@@ -63,6 +63,10 @@ class CustomProviderHandler:
         self.last_buffer_send = datetime.now()
         self.min_audio_threshold = 4000  # Minimum 4KB audio before sending (prevents empty transcriptions)
 
+        # Barge-in / interruption state
+        self.is_speaking = False  # Track if AI is currently speaking
+        self.interrupted = False
+
         # VAD configuration
         self.use_vad = assistant_config.get('use_vad', True) and SILERO_VAD_AVAILABLE
         self.vad_processor = None
@@ -133,6 +137,31 @@ class CustomProviderHandler:
                 # Fallback to time-based buffering
                 await self._handle_media_time_based()
 
+    async def _handle_barge_in(self):
+        """Handle user interruption - stop AI speech immediately"""
+        if not self.is_speaking:
+            return
+
+        logger.info("[CUSTOM_HANDLER] 🛑 BARGE-IN: User speaking while AI is talking, stopping playback")
+        self.is_speaking = False
+        self.interrupted = True
+
+        # Send clear event to Twilio to stop audio playback immediately
+        if self.stream_sid:
+            try:
+                await self.twilio_ws.send_json({
+                    "event": "clear",
+                    "streamSid": self.stream_sid
+                })
+                logger.info("[CUSTOM_HANDLER] 📤 Sent clear event to Twilio")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_HANDLER] Failed to send clear: {e}")
+
+        # Reset audio buffer to capture new speech
+        self.audio_buffer = b''
+        if self.vad_processor:
+            self.vad_processor.reset()
+
     async def _handle_media_with_vad(self, audio_chunk: bytes):
         """
         Handle media using Silero VAD for speech detection.
@@ -140,6 +169,10 @@ class CustomProviderHandler:
         """
         # Process audio chunk through VAD
         is_speech, speech_prob = self.vad_processor.process_chunk(audio_chunk)
+
+        # Barge-in: if user is speaking while AI is talking, interrupt immediately
+        if is_speech and self.is_speaking and speech_prob > 0.5:
+            await self._handle_barge_in()
 
         # Check if a valid speech segment has ended (using the proper method)
         if self.vad_processor.is_speech_ended() and len(self.audio_buffer) >= self.min_audio_threshold:
@@ -164,6 +197,10 @@ class CustomProviderHandler:
         Fallback: Handle media using time-based buffering.
         Used when VAD is not available.
         """
+        # Barge-in: if audio is coming in while AI is speaking, interrupt
+        if self.is_speaking and len(self.audio_buffer) >= self.min_audio_threshold:
+            await self._handle_barge_in()
+
         current_time = datetime.now()
         elapsed_ms = (current_time - self.last_buffer_send).total_seconds() * 1000
         buffer_size = len(self.audio_buffer)
@@ -741,6 +778,7 @@ class CustomProviderHandler:
     async def synthesize_and_send(self, text: str):
         """Synthesize speech and send to caller"""
         try:
+            self.interrupted = False
             if self.tts_provider == 'openai':
                 audio_data = await self.synthesize_openai(text)
             elif self.tts_provider == 'cartesia':
@@ -757,10 +795,13 @@ class CustomProviderHandler:
                 logger.error(f"[TTS] Unsupported provider: {self.tts_provider}")
                 return
 
-            if audio_data:
+            if audio_data and not self.interrupted:
+                self.is_speaking = True
                 await self.send_audio_to_twilio(audio_data)
         except Exception as e:
             logger.error(f"[TTS_ERROR] {e}")
+        finally:
+            self.is_speaking = False
 
     async def synthesize_piper(self, text: str) -> Optional[bytes]:
         """Synthesize using local Piper TTS (offline, no API key required)."""

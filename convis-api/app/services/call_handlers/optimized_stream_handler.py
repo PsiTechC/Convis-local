@@ -516,7 +516,8 @@ class OptimizedStreamHandler:
         self.last_activity_time = time.time()
 
         # Check for barge-in (user speaking while AI is talking)
-        if self.is_speaking and transcript and len(transcript.strip()) > 3:
+        # Lowered threshold to 1 char for faster interruption response
+        if self.is_speaking and transcript and len(transcript.strip()) > 1:
             logger.info(f"[OPTIMIZED] 🛑 BARGE-IN detected! User said: {transcript[:30]}...")
             await self._handle_interruption()
 
@@ -758,6 +759,9 @@ class OptimizedStreamHandler:
             logger.error(f"[OPTIMIZED] Pipeline error: {e}", exc_info=True)
         finally:
             self.is_processing = False
+            # Ensure is_speaking is reset even if mark event doesn't arrive
+            if not self.interrupted:
+                self.is_speaking = False
 
     async def _maybe_schedule_from_conversation(self):
         """

@@ -39,6 +39,7 @@ def resolve_assistant_api_key(db, assistant: dict, required_provider: Optional[s
     # Map provider to environment variable
     env_var_map = {
         'openai': 'OPENAI_API_KEY',
+        'openai-realtime': 'OPENAI_API_KEY',
         'deepgram': 'DEEPGRAM_API_KEY',
         'sarvam': 'SARVAM_API_KEY',
         'google': 'GOOGLE_API_KEY',
