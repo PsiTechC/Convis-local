@@ -1201,6 +1201,12 @@ class OptimizedStreamHandler:
 
             if result.modified_count > 0:
                 logger.info(f"[OPTIMIZED] 💾 Execution logs and real-time transcript saved for call {self.call_sid} ({len(full_transcript)} turns)")
+                # Generate pipeline debug log file
+                try:
+                    from app.utils.pipeline_logger import generate_pipeline_log
+                    generate_pipeline_log(self.call_sid, execution_logs, transcript_text)
+                except Exception as log_err:
+                    logger.warning(f"[OPTIMIZED] Pipeline log generation failed: {log_err}")
             else:
                 logger.warning(f"[OPTIMIZED] ⚠️ Call log not found for {self.call_sid}")
 

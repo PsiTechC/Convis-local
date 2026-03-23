@@ -1,23 +1,50 @@
 Component,Before (Cloud APIs),Model Used Before,After (Self-Hosted AWS),Model Used Now,Cost Before (per call),Cost Now (per call)
-AI Brain,OpenAI API,GPT-4o-mini,Ollama (local),Mistral 7B,$0.02,$0.00
+AI Brain,OpenAI API,GPT-4o-mini,Ollama (local),Llama 3.1 8B / Mistral 7B,$0.02,$0.00
 Speech to Text,Deepgram API,Nova-2,faster-whisper (local),Whisper Medium,$0.013,$0.00
 Text to Speech,ElevenLabs API,Eleven Turbo v2.5,Piper TTS (local),en_US-lessac-medium,$0.15,$0.00
 Phone Calls,Twilio,Twilio,Twilio,Twilio,$0.07,$0.07
-Server,None (local PC),-,AWS g4dn.xlarge,-,$0.00,$0.53/hr
+Server,None (local PC),-,AWS g4dn.xlarge (Mumbai),-,$0.00,$0.579/hr
 Database,Remote MongoDB,MongoDB 7,Local MongoDB (Docker),MongoDB 7,$0.00,$0.00
 Cache,Redis Cloud,Redis 7,Local Redis (Docker),Redis 7,$0.00,$0.00
 ,,,,,,
-COST PER CALL,,,,,$0.25,$0.07
+COST PER CALL (3 min avg),,,,,$0.25,$0.07
 ,,,,,,
-Monthly Estimate,Calls/Month,,Before (Cloud APIs),,After (Self-Hosted),
-,100,,$25,,$407,
-,500,,$125,,$435,
-,1000,,$250,,$470,
-,2000,,$500,,$540,
-,5000,,$1250,,$750,
-,10000,,$2500,,$1100,
+Note: 1 USD = 94 INR,,,,,,
 ,,,,,,
 Fixed Monthly Cost,,,Before,,After,
-,Server,,$0,,$400,
+,Server (g4dn.xlarge 24/7),,$0,,$423,
+,Storage (100GB gp3),,$0,,$10,
+,Elastic IP (free when running),,$0,,$0,
 ,Twilio Number,,$1,,$1,
-,Total Fixed,,$1,,$401,
+,Domain (convis.ai subdomain),,$0,,$0,
+,Total Fixed (24/7),,$1,,$434,
+,,,,,,
+Elastic IP Pricing,,,,,,
+,Instance State,,Cost/Month (USD),,Cost/Month (INR),
+,Running,,$0,,Free,
+,Stopped,,$3.65,,~Rs.343,
+,Released (no IP reserved),,$0,,Free,
+,,,,,,
+AWS Cost When Instance is STOPPED,,,,,,
+,Item,,Cost/Month (USD),,Cost/Month (INR),
+,Storage (100GB gp3),,$10,,~Rs.940,
+,Elastic IP,,$3.65,,~Rs.343,
+,Total (stopped),,$13.65,,~Rs.1283,
+,,,,,,
+AWS Cost When Instance is RUNNING (24/7),,,,,,
+,Item,,Cost/Month (USD),,Cost/Month (INR),
+,g4dn.xlarge compute ($0.579/hr x 730hrs),,$423,,~Rs.39762,
+,Storage (100GB gp3),,$10,,~Rs.940,
+,Elastic IP,,$0,,Free,
+,Data Transfer (~50GB),,$5,,~Rs.470,
+,Total (running 24/7),,$438,,~Rs.41172,
+,,,,,,
+AWS Cost by Usage Pattern,,,,,,
+,Usage Pattern,,Cost/Month (USD),,Cost/Month (INR),
+,24/7 (always on),,$438,,~Rs.41172,
+,12 hrs/day,,$224,,~Rs.21056,
+,8 hrs/day,,$153,,~Rs.14382,
+,4 hrs/day,,$83,,~Rs.7802,
+,2 hrs/day,,$49,,~Rs.4606,
+,Testing only (weekends 4hrs),,$32,,~Rs.3008,
+,Stopped (not using),,$14,,~Rs.1283,
