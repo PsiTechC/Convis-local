@@ -103,6 +103,8 @@ export const ENHANCED_ASR_MODELS = {
     { value: 'tiny', label: 'Whisper Tiny - Fastest (Free, Local)', cost: 0, latency: 150, costPerMin: 0 },
     { value: 'base', label: 'Whisper Base - Balanced (Free, Local)', cost: 0, latency: 300, costPerMin: 0 },
     { value: 'small', label: 'Whisper Small - Best Quality (Free, Local)', cost: 0, latency: 600, costPerMin: 0 },
+    { value: 'medium', label: 'Whisper Medium - High Accuracy (Free, Local)', cost: 0, latency: 1000, costPerMin: 0 },
+    { value: 'large-v3', label: 'Whisper Large-v3 - Best Accuracy (Free, Local)', cost: 0, latency: 2000, costPerMin: 0 },
   ]
 };
 
