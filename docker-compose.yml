@@ -43,7 +43,7 @@ services:
     container_name: convis-api
     restart: unless-stopped
     ports:
-      - "8010:8000"
+      - "8000:8000"
     environment:
       # MongoDB Configuration
       - MONGODB_URI=${MONGODB_URI}
@@ -140,7 +140,7 @@ services:
     container_name: convis-web
     restart: unless-stopped
     ports:
-      - "3010:3000"
+      - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
