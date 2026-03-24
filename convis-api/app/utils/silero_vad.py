@@ -7,6 +7,7 @@ IMPORTANT: Model loading is LAZY to avoid blocking Cloud Run startup.
 The model is only loaded when the first call comes in.
 """
 import logging
+import os
 import numpy as np
 from typing import Tuple, Optional
 import struct
@@ -50,12 +51,22 @@ def load_silero_vad():
         import torch
         torch.set_num_threads(1)  # Optimize for single-threaded inference
 
-        model, utils = torch.hub.load(
-            repo_or_dir='snakers4/silero-vad',
-            model='silero_vad',
-            force_reload=False,
-            onnx=True  # Use ONNX for faster CPU inference
-        )
+        # Try local cache first, then download
+        local_vad_path = '/root/.cache/torch/hub/snakers4_silero-vad_master'
+        if os.path.exists(os.path.join(local_vad_path, 'hubconf.py')):
+            model, utils = torch.hub.load(
+                repo_or_dir=local_vad_path,
+                model='silero_vad',
+                source='local',
+                onnx=False
+            )
+        else:
+            model, utils = torch.hub.load(
+                repo_or_dir='snakers4/silero-vad',
+                model='silero_vad',
+                force_reload=False,
+                onnx=False
+            )
 
         with _vad_lock:
             _vad_model = model

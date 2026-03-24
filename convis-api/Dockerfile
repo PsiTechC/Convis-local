@@ -29,8 +29,9 @@ COPY requirements.txt .
 # Install Python dependencies
 # PyTorch CPU-only for Silero VAD (~200MB vs ~2GB with CUDA)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir pathvalidate
 
 # Production stage
 FROM base AS production
@@ -38,6 +39,7 @@ FROM base AS production
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
     tesseract-ocr \
     tesseract-ocr-eng \
     libgl1 \
@@ -56,8 +58,13 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
 
 # Create necessary directories with proper permissions
-RUN mkdir -p uploads/knowledge_base chroma_db logs models/whisper models/piper && \
+RUN mkdir -p uploads/knowledge_base chroma_db logs logs/pipeline models/whisper models/piper && \
     chmod -R 755 uploads chroma_db logs models
+
+# Pre-download Silero VAD model (avoids runtime download + rate limiting)
+RUN mkdir -p /root/.cache/torch/hub && \
+    cd /root/.cache/torch/hub && \
+    git clone --depth 1 https://github.com/snakers4/silero-vad.git snakers4_silero-vad_master
 
 # Expose port (internal container port)
 EXPOSE 8000
