@@ -669,7 +669,15 @@ class OptimizedStreamHandler:
         
         try:
             logger.info(f"[OPTIMIZED] 🚀 === PIPELINE START (gen={current_gen_id}) ===")
-            
+
+            # Capture Whisper ASR timing (from the ASR handler)
+            asr_time = 0
+            if hasattr(self, 'asr') and hasattr(self.asr, 'last_transcription_time_ms'):
+                asr_time = self.asr.last_transcription_time_ms
+                if asr_time > 0:
+                    self.metrics.setdefault("asr_latency_ms", []).append(asr_time)
+                    logger.info(f"[OPTIMIZED] 🎤 Whisper transcription took: {asr_time:.0f}ms")
+
             # Add to conversation history
             self.conversation.add_user_message(text)
             
@@ -967,15 +975,21 @@ class OptimizedStreamHandler:
             self.is_speaking = False
     
     async def _send_audio_chunk(self, audio_bytes: bytes):
-        """Send audio chunk to Twilio"""
+        """Send audio chunk to Twilio in small pieces for better barge-in"""
         if not audio_bytes or not self.stream_sid:
             return
-        
+
         if self.interrupted:
             return  # Don't send if interrupted
-        
-        # Queue audio for sending
-        await self.audio_queue.put(audio_bytes)
+
+        # Split audio into small chunks (~160 bytes = 20ms at 8kHz mulaw)
+        # This allows faster interruption - less audio buffered in Twilio
+        CHUNK_SIZE = 160  # 20ms of 8kHz mulaw audio
+        for i in range(0, len(audio_bytes), CHUNK_SIZE):
+            if self.interrupted:
+                return  # Stop immediately if interrupted mid-chunk
+            chunk = audio_bytes[i:i + CHUNK_SIZE]
+            await self.audio_queue.put(chunk)
     
     async def _audio_sender_loop(self):
         """Send queued audio to Twilio"""

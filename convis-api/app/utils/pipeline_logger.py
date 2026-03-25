@@ -5,10 +5,11 @@ Generates readable debug logs for each call showing:
   - Overall performance
   - Turn-by-turn breakdown with sentences and timing
   - Full transcript
-  - Conclusion with issue detection
+  - Smart conclusion with automatic issue detection
 """
 
 import os
+import re
 import logging
 from datetime import datetime, timezone
 
@@ -19,13 +20,22 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Thresholds for issue detection
-ASR_SLOW_MS = 1500       # Whisper taking more than 1.5s is slow
-LLM_SLOW_MS = 3000       # LLM taking more than 3s is slow
-TTS_SLOW_MS = 800        # TTS taking more than 0.8s is slow
+ASR_SLOW_MS = 1500
+LLM_SLOW_MS = 3000
+TTS_SLOW_MS = 800
+LONG_RESPONSE_CHARS = 150  # Bot response too long for phone call
+MAX_GOOD_TURN_MS = 2500    # Total turn time should be under 2.5s
+
 HALLUCINATION_PHRASES = [
     "thank you", "thanks", "bye", "goodbye", "i love", "hip-hop",
     "subscribe", "like and subscribe", "see you next time",
-    "the end", "music", "applause"
+    "the end", "music", "applause", "bye-bye, everyone",
+    "bye, snowball", "i love that", "and then"
+]
+
+GOODBYE_PHRASES = [
+    "bye", "goodbye", "bye-bye", "okay bye", "thank you bye",
+    "that's all", "nothing else", "no thanks bye"
 ]
 
 
@@ -33,12 +43,27 @@ def _detect_hallucination(text: str) -> bool:
     """Check if text looks like a Whisper hallucination."""
     if not text:
         return False
-    text_lower = text.strip().lower()
-    # Very short generic phrases on their own are likely hallucinations
+    text_lower = text.strip().lower().rstrip(".")
     for phrase in HALLUCINATION_PHRASES:
         if text_lower == phrase or text_lower == phrase + ".":
             return True
     return False
+
+
+def _detect_goodbye(text: str) -> bool:
+    """Check if user is saying goodbye."""
+    if not text:
+        return False
+    text_lower = text.strip().lower().rstrip(".")
+    for phrase in GOODBYE_PHRASES:
+        if phrase in text_lower:
+            return True
+    return False
+
+
+def _has_numbered_list(text: str) -> bool:
+    """Check if bot response contains numbered lists."""
+    return bool(re.search(r'\d+[\.\)]\s', text))
 
 
 def _ms_to_seconds(ms: float) -> str:
@@ -91,7 +116,7 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
                 continue
             turns.append({"user": user_text, "assistant": assistant_text})
 
-        # Collect timing per turn from metrics
+        # Collect timing per turn
         turn_timings = {}
         for m in metrics:
             turn_num = m.get("turn", 0)
@@ -103,10 +128,15 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
 
         # Issue tracking
         issues = []
+        warnings = []
         hallucination_count = 0
         slow_llm_count = 0
         slow_asr_count = 0
         slow_tts_count = 0
+        verbose_count = 0
+        list_count = 0
+        ignored_answer_count = 0
+        goodbye_ignored = False
 
         lines = []
         lines.append("=" * 70)
@@ -127,11 +157,12 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
         lines.append("--- OVERALL PERFORMANCE ---")
         lines.append(f"  Total turns       : {perf.get('total_turns', 0)}")
         lines.append(f"  Session duration  : {session_ms:.0f}ms ({_ms_to_seconds(session_ms)})")
+        lines.append(f"    (This is total pipeline processing time, not call length)")
         lines.append("")
 
         # ── TURN-BY-TURN BREAKDOWN ──
         lines.append("--- TURN-BY-TURN BREAKDOWN ---")
-        lines.append("  (Each turn = User speaks → Whisper listens → Ollama thinks → Piper speaks)")
+        lines.append("  (Each turn = User speaks -> Whisper listens -> Ollama thinks -> Piper speaks)")
         lines.append("")
 
         for idx, turn in enumerate(turns):
@@ -142,10 +173,23 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
             tts_ms = timing.get("tts", 0)
             total_turn_ms = asr_ms + llm_ms + tts_ms
 
-            # Check for issues
+            # ── Issue detection per turn ──
             is_hallucination = _detect_hallucination(turn["user"])
             if is_hallucination:
                 hallucination_count += 1
+
+            is_verbose = len(turn["assistant"]) > LONG_RESPONSE_CHARS if turn["assistant"] else False
+            if is_verbose:
+                verbose_count += 1
+
+            has_list = _has_numbered_list(turn["assistant"]) if turn["assistant"] else False
+            if has_list:
+                list_count += 1
+
+            is_goodbye = _detect_goodbye(turn["user"])
+            if is_goodbye and turn["assistant"] and not any(g in turn["assistant"].lower() for g in ["bye", "great day", "goodbye"]):
+                goodbye_ignored = True
+
             if asr_ms > ASR_SLOW_MS:
                 slow_asr_count += 1
             if llm_ms > LLM_SLOW_MS:
@@ -153,29 +197,53 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
             if tts_ms > TTS_SLOW_MS:
                 slow_tts_count += 1
 
-            lines.append(f"  Turn {turn_num}:")
-            if turn["user"]:
-                halluc_tag = " [HALLUCINATION?]" if is_hallucination else ""
-                lines.append(f"    User said    : \"{turn['user']}\"{halluc_tag}")
-            if turn["assistant"]:
-                lines.append(f"    Bot replied  : \"{turn['assistant'][:80]}{'...' if len(turn['assistant']) > 80 else ''}\"")
+            # Check if bot asked same question as previous turn
+            if idx > 0 and turn["assistant"] and turns[idx-1]["assistant"]:
+                if turn["assistant"][:50] == turns[idx-1]["assistant"][:50]:
+                    ignored_answer_count += 1
 
-            # Timing breakdown
+            # ── Write turn ──
+            turn_issues = []
+            lines.append(f"  Turn {turn_num}:")
+
+            if turn["user"]:
+                halluc_tag = ""
+                if is_hallucination:
+                    halluc_tag = " [!!! LIKELY HALLUCINATION - Whisper misheard noise as speech]"
+                lines.append(f"    You said      : \"{turn['user']}\"{halluc_tag}")
+
+            if turn["assistant"]:
+                resp_preview = turn['assistant'][:100]
+                if len(turn['assistant']) > 100:
+                    resp_preview += "..."
+                lines.append(f"    Bot replied   : \"{resp_preview}\"")
+
+                if is_verbose:
+                    turn_issues.append("BOT TOO VERBOSE - Response too long for phone call")
+                if has_list:
+                    turn_issues.append("BOT USED NUMBERED LIST - Bad for voice calls")
+
+            # Timing
             if asr_ms > 0 or llm_ms > 0 or tts_ms > 0:
                 lines.append(f"    Timing:")
                 if asr_ms > 0:
-                    slow_tag = " (SLOW!)" if asr_ms > ASR_SLOW_MS else ""
-                    lines.append(f"      Whisper (listening)  : {asr_ms:.0f}ms ({_ms_to_seconds(asr_ms)}){slow_tag}")
+                    tag = " [SLOW!]" if asr_ms > ASR_SLOW_MS else ""
+                    lines.append(f"      Whisper (listening)  : {asr_ms:.0f}ms ({_ms_to_seconds(asr_ms)}){tag}")
                 if llm_ms > 0:
-                    slow_tag = " (SLOW!)" if llm_ms > LLM_SLOW_MS else ""
-                    lines.append(f"      Ollama (thinking)    : {llm_ms:.0f}ms ({_ms_to_seconds(llm_ms)}){slow_tag}")
+                    tag = " [SLOW!]" if llm_ms > LLM_SLOW_MS else ""
+                    lines.append(f"      Ollama (thinking)    : {llm_ms:.0f}ms ({_ms_to_seconds(llm_ms)}){tag}")
                 if tts_ms > 0:
-                    slow_tag = " (SLOW!)" if tts_ms > TTS_SLOW_MS else ""
-                    lines.append(f"      Piper (speaking)     : {tts_ms:.0f}ms ({_ms_to_seconds(tts_ms)}){slow_tag}")
+                    tag = " [SLOW!]" if tts_ms > TTS_SLOW_MS else ""
+                    lines.append(f"      Piper (speaking)     : {tts_ms:.0f}ms ({_ms_to_seconds(tts_ms)}){tag}")
                 if total_turn_ms > 0:
-                    lines.append(f"      Total for this turn  : {total_turn_ms:.0f}ms ({_ms_to_seconds(total_turn_ms)})")
+                    tag = " [SLOW TURN!]" if total_turn_ms > MAX_GOOD_TURN_MS else ""
+                    lines.append(f"      Total for this turn  : {total_turn_ms:.0f}ms ({_ms_to_seconds(total_turn_ms)}){tag}")
             else:
-                lines.append(f"    Timing: Not recorded for this turn")
+                lines.append(f"    Timing: Not recorded")
+
+            if turn_issues:
+                for ti in turn_issues:
+                    lines.append(f"    >>> ISSUE: {ti}")
 
             lines.append("")
 
@@ -195,43 +263,110 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
         lines.append("")
 
         # ── CONCLUSION ──
-        lines.append("--- CONCLUSION ---")
+        lines.append("=" * 70)
+        lines.append("  CONCLUSION - AUTOMATIC ISSUE DETECTION")
+        lines.append("=" * 70)
+        lines.append("")
 
-        # Detect issues
+        # Detect all issues
         if hallucination_count > 0:
-            issues.append(f"WHISPER ISSUE: {hallucination_count} possible hallucination(s) detected. "
-                         f"Whisper misheard silence/noise as words. "
-                         f"Fix: Use a larger Whisper model (medium/large-v3) or reduce background noise.")
+            issues.append(
+                f"WHISPER PROBLEM: {hallucination_count} hallucination(s) detected.\n"
+                f"    What happened : Whisper heard noise/silence and invented words like 'Thank you'\n"
+                f"    Why           : Whisper model too small or background noise too high\n"
+                f"    Fix           : Use Whisper Medium or Large-v3 model, or use earphones when testing"
+            )
 
         if slow_llm_count > 0:
-            issues.append(f"OLLAMA ISSUE: {slow_llm_count} slow response(s) detected (>{LLM_SLOW_MS}ms). "
-                         f"Fix: Reduce max tokens, use a smaller model, or warm up Ollama before calls.")
+            issues.append(
+                f"OLLAMA PROBLEM: {slow_llm_count} slow response(s) over {LLM_SLOW_MS}ms.\n"
+                f"    What happened : Bot took too long to think of a reply\n"
+                f"    Why           : First call after restart (cold start) or max tokens too high\n"
+                f"    Fix           : Warm up Ollama before calls, reduce max tokens to 50-75"
+            )
 
         if slow_asr_count > 0:
-            issues.append(f"WHISPER ISSUE: {slow_asr_count} slow transcription(s) detected (>{ASR_SLOW_MS}ms). "
-                         f"Fix: Use a smaller Whisper model or check GPU load.")
+            issues.append(
+                f"WHISPER PROBLEM: {slow_asr_count} slow transcription(s) over {ASR_SLOW_MS}ms.\n"
+                f"    What happened : Whisper took too long to convert your speech to text\n"
+                f"    Why           : Large Whisper model or GPU overloaded\n"
+                f"    Fix           : Use a smaller Whisper model or check GPU usage with nvidia-smi"
+            )
 
         if slow_tts_count > 0:
-            issues.append(f"PIPER ISSUE: {slow_tts_count} slow synthesis(es) detected (>{TTS_SLOW_MS}ms). "
-                         f"Fix: Use shorter bot responses (reduce max tokens).")
+            issues.append(
+                f"PIPER PROBLEM: {slow_tts_count} slow synthesis over {TTS_SLOW_MS}ms.\n"
+                f"    What happened : Piper took too long to convert text to speech\n"
+                f"    Why           : Bot response was too long (many words to speak)\n"
+                f"    Fix           : Reduce max tokens so bot gives shorter replies"
+            )
+
+        if verbose_count > 0:
+            issues.append(
+                f"BOT TOO VERBOSE: {verbose_count} response(s) were too long for a phone call.\n"
+                f"    What happened : Bot gave long paragraph replies instead of short sentences\n"
+                f"    Why           : Max tokens too high or system prompt not strict enough\n"
+                f"    Fix           : Set max tokens to 50, add 'ONE short sentence per reply' to prompt"
+            )
+
+        if list_count > 0:
+            issues.append(
+                f"BOT USED LISTS: {list_count} response(s) contained numbered lists.\n"
+                f"    What happened : Bot said '1. ... 2. ... 3. ...' which is bad for voice\n"
+                f"    Why           : System prompt allows listing or max tokens too high\n"
+                f"    Fix           : Add 'Never use numbered lists' to system prompt"
+            )
+
+        if ignored_answer_count > 0:
+            issues.append(
+                f"BOT MEMORY PROBLEM: Bot repeated the same question {ignored_answer_count} time(s).\n"
+                f"    What happened : User already answered but bot asked the same thing again\n"
+                f"    Why           : LLM model too small (can't remember context) or Whisper misheard\n"
+                f"    Fix           : Use Llama 3.1 8B instead of 3B, or check if Whisper heard correctly"
+            )
+
+        if goodbye_ignored:
+            issues.append(
+                f"BOT IGNORED GOODBYE: User said bye but bot kept talking.\n"
+                f"    What happened : User wanted to end the call but bot continued with more questions\n"
+                f"    Why           : Bot interpreted goodbye as something else\n"
+                f"    Fix           : Add 'When user says bye, say goodbye and stop' to system prompt"
+            )
 
         if len(turns) <= 1:
-            issues.append("CALL ISSUE: Only 1 turn or less. The call ended too quickly. "
-                         "Possible causes: VAD not detecting speech, Twilio webhook failure, or call disconnected.")
+            issues.append(
+                f"CALL FAILED: Only {len(turns)} turn(s). Call ended too quickly.\n"
+                f"    What happened : Bot greeted but no conversation happened\n"
+                f"    Why           : VAD not detecting speech, webhook failure, or call disconnected\n"
+                f"    Fix           : Check if VAD is working, check Twilio webhook URLs, check server logs"
+            )
 
-        # Check if bot repeated itself
+        # Check bot repeated itself
         bot_responses = [t["assistant"] for t in turns if t["assistant"]]
         if len(bot_responses) > 2:
             repeated = len(bot_responses) - len(set(bot_responses))
             if repeated > 0:
-                issues.append(f"LLM ISSUE: Bot repeated the same response {repeated} time(s). "
-                             f"Fix: Use a larger LLM model (8B+) that remembers context better.")
+                issues.append(
+                    f"BOT LOOPING: Bot gave the exact same response {repeated} time(s).\n"
+                    f"    What happened : Bot got stuck in a loop repeating itself\n"
+                    f"    Why           : LLM too small or system prompt too complex\n"
+                    f"    Fix           : Use Llama 3.1 8B, simplify system prompt, reduce max tokens"
+                )
 
+        # Write conclusion
         if issues:
-            for issue in issues:
-                lines.append(f"  ! {issue}")
+            lines.append(f"  ISSUES FOUND: {len(issues)}")
+            lines.append("")
+            for i, issue in enumerate(issues):
+                lines.append(f"  Issue {i+1}:")
+                for issue_line in issue.split("\n"):
+                    lines.append(f"    {issue_line}")
+                lines.append("")
         else:
-            lines.append("  No issues detected. Call completed successfully.")
+            lines.append("  NO ISSUES DETECTED")
+            lines.append("")
+            lines.append("  Call completed successfully. All models performed within normal range.")
+            lines.append(f"  Average response time: {session_ms / max(len(turns), 1):.0f}ms per turn")
 
         lines.append("")
         lines.append("=" * 70)
@@ -246,10 +381,9 @@ def generate_pipeline_log(call_sid: str, execution_logs: dict, transcript: str =
         # Console summary
         logger.info(f"[PIPELINE_LOG] Debug log saved: {filepath}")
         if issues:
-            for issue in issues:
-                logger.warning(f"[PIPELINE_LOG] {issue}")
+            logger.warning(f"[PIPELINE_LOG] {len(issues)} issue(s) detected in call {call_sid}")
         else:
-            logger.info(f"[PIPELINE_LOG] No issues detected")
+            logger.info(f"[PIPELINE_LOG] No issues detected in call {call_sid}")
 
         return filepath
 

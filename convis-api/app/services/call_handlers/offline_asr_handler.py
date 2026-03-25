@@ -117,6 +117,7 @@ class OfflineWhisperASR:
         # State (matching StreamingDeepgramASR properties)
         self.is_connected = False
         self.current_transcript = ""
+        self.last_transcription_time_ms = 0  # Track Whisper processing time
         self.ws = None  # Prevents keepalive loop from crashing (it checks self.asr.ws)
 
         # Whisper model (loaded lazily in connect())
@@ -286,15 +287,19 @@ class OfflineWhisperASR:
                 return
 
             # Transcribe in thread pool to avoid blocking
+            import time as _time
+            _asr_start = _time.time()
             loop = asyncio.get_event_loop()
             text, confidence = await loop.run_in_executor(
                 self._executor,
                 lambda: self._whisper_transcribe(audio)
             )
+            _asr_time_ms = (_time.time() - _asr_start) * 1000
+            self.last_transcription_time_ms = _asr_time_ms
 
             if text and text.strip():
                 self.current_transcript = text.strip()
-                logger.info(f"[OFFLINE_ASR] Transcript: {self.current_transcript}")
+                logger.info(f"[OFFLINE_ASR] Transcript: {self.current_transcript} (Whisper took {_asr_time_ms:.0f}ms)")
 
                 # Fire callbacks
                 if self.on_confidence_update:
