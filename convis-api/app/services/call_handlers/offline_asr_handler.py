@@ -13,6 +13,7 @@ Architecture: VAD-buffered batch transcription
 
 import asyncio
 import logging
+import os
 import threading
 import time
 import numpy as np
@@ -269,7 +270,7 @@ class OfflineWhisperASR:
         return self._vad.is_speaking, speech_prob
 
     async def _transcribe_buffer(self):
-        """Transcribe accumulated audio buffer with faster-whisper."""
+        """Transcribe accumulated audio buffer — uses GPU container if available, falls back to local CPU."""
         if self._transcribing or not self._audio_buffer:
             return
 
@@ -286,14 +287,21 @@ class OfflineWhisperASR:
                 logger.debug(f"[OFFLINE_ASR] Skipping short segment ({len(audio)} samples)")
                 return
 
-            # Transcribe in thread pool to avoid blocking
             import time as _time
             _asr_start = _time.time()
-            loop = asyncio.get_event_loop()
-            text, confidence = await loop.run_in_executor(
-                self._executor,
-                lambda: self._whisper_transcribe(audio)
-            )
+
+            # Try GPU container first (much faster: ~600ms vs ~2600ms on CPU)
+            whisper_api_url = os.environ.get("WHISPER_API_URL", "")
+            if whisper_api_url:
+                text, confidence = await self._transcribe_via_gpu_api(audio, whisper_api_url)
+            else:
+                # Fallback to local CPU Whisper
+                loop = asyncio.get_event_loop()
+                text, confidence = await loop.run_in_executor(
+                    self._executor,
+                    lambda: self._whisper_transcribe(audio)
+                )
+
             _asr_time_ms = (_time.time() - _asr_start) * 1000
             self.last_transcription_time_ms = _asr_time_ms
 
@@ -317,6 +325,53 @@ class OfflineWhisperASR:
             logger.error(f"[OFFLINE_ASR] Transcription error: {e}", exc_info=True)
         finally:
             self._transcribing = False
+
+    async def _transcribe_via_gpu_api(self, audio: np.ndarray, api_url: str):
+        """Send audio to the Whisper GPU container API for fast transcription."""
+        import aiohttp
+        import io
+        import soundfile as sf
+
+        try:
+            # Convert float32 numpy array to WAV bytes
+            wav_buffer = io.BytesIO()
+            sf.write(wav_buffer, audio, 16000, format='WAV')
+            wav_buffer.seek(0)
+
+            # Send to GPU container API
+            form = aiohttp.FormData()
+            form.add_field('file', wav_buffer, filename='audio.wav', content_type='audio/wav')
+            form.add_field('model', self.model_size)  # Uses the model selected in assistant settings
+            form.add_field('language', self.language if self.language not in ("auto", "") else "en")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{api_url}/v1/audio/transcriptions",
+                    data=form,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        text = result.get("text", "").strip()
+                        logger.info(f"[OFFLINE_ASR] GPU transcription: {text}")
+                        return text, 0.9  # GPU container doesn't return confidence
+                    else:
+                        error = await response.text()
+                        logger.warning(f"[OFFLINE_ASR] GPU API error ({response.status}): {error}")
+                        # Fallback to local CPU
+                        loop = asyncio.get_event_loop()
+                        return await loop.run_in_executor(
+                            self._executor,
+                            lambda: self._whisper_transcribe(audio)
+                        )
+
+        except Exception as e:
+            logger.warning(f"[OFFLINE_ASR] GPU API failed, using local CPU: {e}")
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                self._executor,
+                lambda: self._whisper_transcribe(audio)
+            )
 
     def _whisper_transcribe(self, audio: np.ndarray):
         """Run faster-whisper transcription (blocking, runs in thread)."""
