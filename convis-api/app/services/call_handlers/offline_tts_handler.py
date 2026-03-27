@@ -373,30 +373,40 @@ class XttsTTSHandler:
             async with aiohttp.ClientSession() as session:
                 async with session.post(f"{self.xtts_url}/tts", json=payload) as resp:
                     if resp.status == 200:
-                        response_data = await resp.json()
-                        if isinstance(response_data, str):
-                            audio_b64 = response_data
+                        # XTTS returns base64-encoded WAV as JSON string
+                        raw_response = await resp.text()
+                        audio_b64 = raw_response.strip().strip('"')
+
+                        wav_data = base64.b64decode(audio_b64)
+
+                        # Parse WAV file properly to extract PCM data
+                        if wav_data[:4] == b'RIFF':
+                            wav_io = io.BytesIO(wav_data)
+                            with wave.open(wav_io, 'rb') as wav_file:
+                                sample_rate = wav_file.getframerate()
+                                n_channels = wav_file.getnchannels()
+                                sample_width = wav_file.getsampwidth()
+                                pcm_data = wav_file.readframes(wav_file.getnframes())
+                                logger.debug(f"[XTTS_TTS] WAV: {sample_rate}Hz, {n_channels}ch, {sample_width}B")
                         else:
-                            audio_b64 = await resp.text()
-                            audio_b64 = audio_b64.strip('"')
+                            pcm_data = wav_data
+                            sample_rate = self.native_sample_rate
 
-                        pcm_24k = base64.b64decode(audio_b64)
+                        # Convert to mono if stereo
+                        if wav_data[:4] == b'RIFF' and n_channels == 2:
+                            pcm_data = audioop.tomono(pcm_data, sample_width, 1, 1)
 
-                        # Remove WAV header if present (first 44 bytes)
-                        if pcm_24k[:4] == b'RIFF':
-                            pcm_24k = pcm_24k[44:]
-
-                        # Convert 24kHz PCM to 8kHz mulaw for Twilio
+                        # Convert to 8kHz mulaw for Twilio
                         if not self.for_browser:
-                            pcm_8k, _ = audioop.ratecv(pcm_24k, 2, 1, self.native_sample_rate, 8000, None)
+                            pcm_8k, _ = audioop.ratecv(pcm_data, sample_width, 1, sample_rate, 8000, None)
                             mulaw_audio = audioop.lin2ulaw(pcm_8k, 2)
                             _elapsed = (time.time() - _start) * 1000
                             logger.info(f"[XTTS_TTS] Synthesized {len(mulaw_audio)} bytes (8kHz mulaw) in {_elapsed:.0f}ms: {text[:50]}...")
                             return mulaw_audio
                         else:
                             _elapsed = (time.time() - _start) * 1000
-                            logger.info(f"[XTTS_TTS] Synthesized {len(pcm_24k)} bytes (24kHz PCM) in {_elapsed:.0f}ms: {text[:50]}...")
-                            return pcm_24k
+                            logger.info(f"[XTTS_TTS] Synthesized {len(pcm_data)} bytes ({sample_rate}Hz PCM) in {_elapsed:.0f}ms: {text[:50]}...")
+                            return pcm_data
                     else:
                         logger.error(f"[XTTS_TTS] API error: {resp.status}")
                         return bytes()
