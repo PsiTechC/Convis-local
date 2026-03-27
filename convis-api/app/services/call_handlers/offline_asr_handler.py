@@ -305,8 +305,44 @@ class OfflineWhisperASR:
             _asr_time_ms = (_time.time() - _asr_start) * 1000
             self.last_transcription_time_ms = _asr_time_ms
 
+            # Filter out hallucinations and background noise transcriptions
             if text and text.strip():
-                self.current_transcript = text.strip()
+                text = text.strip()
+
+                # Check audio energy — reject low-energy segments (background TV/music)
+                rms_energy = np.sqrt(np.mean(audio ** 2))
+                if rms_energy < 0.01:  # Very quiet audio — likely background noise
+                    logger.info(f"[OFFLINE_ASR] Rejected low-energy audio (RMS={rms_energy:.4f}): {text}")
+                    return
+
+                # Filter known Whisper hallucination phrases
+                hallucination_phrases = [
+                    "thank you for watching", "thanks for watching", "see you next time",
+                    "like and subscribe", "subscribe", "see you later",
+                    "bye bye bye", "thank you. thank you. thank you",
+                    "have a great week", "thank you very much. thank you",
+                    "thank you for joining", "we'll see you next time",
+                    "have a good one", "thanks for joining us",
+                ]
+                text_lower = text.lower().strip().rstrip(".")
+                is_hallucination = False
+                for phrase in hallucination_phrases:
+                    if phrase in text_lower:
+                        is_hallucination = True
+                        break
+
+                # Also detect repetitive patterns like "Bye. Bye. Bye. Bye."
+                words = text_lower.split()
+                if len(words) >= 4:
+                    unique_words = set(words)
+                    if len(unique_words) <= 2:  # Same 1-2 words repeated many times
+                        is_hallucination = True
+
+                if is_hallucination:
+                    logger.info(f"[OFFLINE_ASR] Filtered hallucination: {text}")
+                    return
+
+                self.current_transcript = text
                 logger.info(f"[OFFLINE_ASR] Transcript: {self.current_transcript} (Whisper took {_asr_time_ms:.0f}ms)")
 
                 # Fire callbacks
