@@ -266,6 +266,13 @@ class OptimizedStreamHandler:
                 for_browser=False
             )
             logger.info(f"[OPTIMIZED] ✅ Using Piper offline TTS (voice: {tts_voice})")
+        elif tts_provider == "xtts":
+            from .offline_tts_handler import XttsTTSHandler
+            self.tts = XttsTTSHandler(
+                voice=tts_voice or "Gracie Wise",
+                for_browser=False
+            )
+            logger.info(f"[OPTIMIZED] ✅ Using XTTS TTS (voice: {tts_voice})")
         else:
             # Default to ElevenLabs
             elevenlabs_key = self.provider_keys.get("elevenlabs") or os.getenv("ELEVENLABS_API_KEY")

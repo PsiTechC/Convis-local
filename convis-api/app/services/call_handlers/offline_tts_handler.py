@@ -306,3 +306,126 @@ class OfflinePiperTTS:
                     await on_audio_chunk(audio)
 
         return bytes(all_audio)
+
+
+class XttsTTSHandler:
+    """
+    XTTS v2 TTS Handler — uses the XTTS GPU container for natural voice synthesis.
+    Streams audio via the /tts_stream endpoint for lower latency.
+    """
+
+    def __init__(self, voice: str = "Gracie Wise", for_browser: bool = False):
+        self.voice = voice
+        self.for_browser = for_browser
+        self.xtts_url = os.environ.get("XTTS_API_URL", "http://host.docker.internal:5500")
+        self._speakers = None
+        self._speaker_data = None
+        self.native_sample_rate = 24000
+        logger.info(f"[XTTS_TTS] Initialized: voice={voice}, url={self.xtts_url}")
+
+    async def _load_speaker(self):
+        """Load speaker embedding from XTTS container."""
+        if self._speaker_data:
+            return
+
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.xtts_url}/studio_speakers") as resp:
+                    if resp.status == 200:
+                        self._speakers = await resp.json()
+                        if self.voice in self._speakers:
+                            self._speaker_data = self._speakers[self.voice]
+                            logger.info(f"[XTTS_TTS] Loaded speaker: {self.voice}")
+                        else:
+                            # Fallback to first available speaker
+                            first_key = list(self._speakers.keys())[0]
+                            self._speaker_data = self._speakers[first_key]
+                            logger.warning(f"[XTTS_TTS] Voice '{self.voice}' not found, using '{first_key}'")
+                    else:
+                        logger.error(f"[XTTS_TTS] Failed to load speakers: {resp.status}")
+        except Exception as e:
+            logger.error(f"[XTTS_TTS] Error loading speakers: {e}")
+
+    async def synthesize(self, text: str) -> bytes:
+        """Synthesize text using XTTS and return 8kHz mulaw audio."""
+        if not text or not text.strip():
+            return bytes()
+
+        await self._load_speaker()
+        if not self._speaker_data:
+            logger.error("[XTTS_TTS] No speaker data available")
+            return bytes()
+
+        import aiohttp
+        import base64
+
+        _start = time.time()
+
+        try:
+            payload = {
+                "text": text,
+                "language": "en",
+                "speaker_embedding": self._speaker_data["speaker_embedding"],
+                "gpt_cond_latent": self._speaker_data["gpt_cond_latent"],
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{self.xtts_url}/tts", json=payload) as resp:
+                    if resp.status == 200:
+                        response_data = await resp.json()
+                        if isinstance(response_data, str):
+                            audio_b64 = response_data
+                        else:
+                            audio_b64 = await resp.text()
+                            audio_b64 = audio_b64.strip('"')
+
+                        pcm_24k = base64.b64decode(audio_b64)
+
+                        # Remove WAV header if present (first 44 bytes)
+                        if pcm_24k[:4] == b'RIFF':
+                            pcm_24k = pcm_24k[44:]
+
+                        # Convert 24kHz PCM to 8kHz mulaw for Twilio
+                        if not self.for_browser:
+                            pcm_8k, _ = audioop.ratecv(pcm_24k, 2, 1, self.native_sample_rate, 8000, None)
+                            mulaw_audio = audioop.lin2ulaw(pcm_8k, 2)
+                            _elapsed = (time.time() - _start) * 1000
+                            logger.info(f"[XTTS_TTS] Synthesized {len(mulaw_audio)} bytes (8kHz mulaw) in {_elapsed:.0f}ms: {text[:50]}...")
+                            return mulaw_audio
+                        else:
+                            _elapsed = (time.time() - _start) * 1000
+                            logger.info(f"[XTTS_TTS] Synthesized {len(pcm_24k)} bytes (24kHz PCM) in {_elapsed:.0f}ms: {text[:50]}...")
+                            return pcm_24k
+                    else:
+                        logger.error(f"[XTTS_TTS] API error: {resp.status}")
+                        return bytes()
+
+        except Exception as e:
+            logger.error(f"[XTTS_TTS] Synthesis error: {e}")
+            return bytes()
+
+    async def synthesize_streaming(
+        self,
+        text: str,
+        on_audio_chunk: Optional[Callable[[bytes], Awaitable[None]]] = None,
+    ) -> bytes:
+        """Stream synthesis — split into sentences, synthesize each via XTTS."""
+        if not text or not text.strip():
+            return bytes()
+
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        all_audio = bytearray()
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+
+            audio = await self.synthesize(sentence)
+            if audio:
+                all_audio.extend(audio)
+                if on_audio_chunk:
+                    await on_audio_chunk(audio)
+
+        return bytes(all_audio)

@@ -74,9 +74,19 @@ export const ENHANCED_TTS_VOICES = {
     { value: 'en_US-lessac-medium', label: 'Lessac - American Female', gender: 'female', accent: 'American' },
     { value: 'en_US-lessac-high', label: 'Lessac - American Female (HQ)', gender: 'female', accent: 'American' },
     { value: 'en_US-amy-medium', label: 'Amy - American Female', gender: 'female', accent: 'American' },
+    { value: 'en_US-ryan-medium', label: 'Ryan - American Male', gender: 'male', accent: 'American' },
     { value: 'en_GB-alba-medium', label: 'Alba - British Female', gender: 'female', accent: 'British' },
+    { value: 'en_US-libritts_r-medium', label: 'LibriTTS - American Neutral', gender: 'neutral', accent: 'American' },
     { value: 'hi_IN-priyamvada-medium', label: 'Priyamvada - Hindi Female', gender: 'female', accent: 'Indian' },
     { value: 'hi_IN-pratham-medium', label: 'Pratham - Hindi Male', gender: 'male', accent: 'Indian' },
+  ],
+  xtts: [
+    { value: 'Gracie Wise', label: 'Gracie - Professional Female', gender: 'female', accent: 'American' },
+    { value: 'Tammie Ema', label: 'Tammie - Friendly Female', gender: 'female', accent: 'American' },
+    { value: 'Brenda Stern', label: 'Brenda - Confident Female', gender: 'female', accent: 'American' },
+    { value: 'Craig Gutsy', label: 'Craig - Professional Male', gender: 'male', accent: 'American' },
+    { value: 'Damjan Chapman', label: 'Damjan - Balanced Male', gender: 'male', accent: 'American' },
+    { value: 'Luis Moray', label: 'Luis - Warm Male', gender: 'male', accent: 'American' },
   ],
 };
 
@@ -136,6 +146,9 @@ export const ENHANCED_TTS_MODELS = {
   piper: [
     { value: 'medium', label: 'Medium Quality (Free, Local)', cost: 0, latency: 50, costPerChar: 0 },
     { value: 'high', label: 'High Quality (Free, Local)', cost: 0, latency: 80, costPerChar: 0 },
+  ],
+  xtts: [
+    { value: 'default', label: 'XTTS Streaming (Free, Local, Natural)', cost: 0, latency: 400, costPerChar: 0 },
   ]
 };
 

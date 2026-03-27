@@ -31,7 +31,7 @@ def resolve_assistant_api_key(db, assistant: dict, required_provider: Optional[s
     provider = required_provider or 'openai'
 
     # Local providers that do not require API keys
-    local_providers = {'piper', 'ollama', 'whisper'}
+    local_providers = {'piper', 'ollama', 'whisper', 'xtts'}
     if provider.lower() in local_providers:
         logger.info(f"✓ Provider '{provider}' does not require an API key")
         return "", provider
@@ -103,7 +103,7 @@ def resolve_provider_keys(db, assistant: dict, user_id: ObjectId) -> Dict[str, s
     logger.info(f"Resolving system API keys for providers: {needed_providers}")
 
     # Providers that do not require API keys
-    local_providers = {'piper', 'ollama', 'whisper'}
+    local_providers = {'piper', 'ollama', 'whisper', 'xtts'}
 
     # Get keys from environment variables only
     env_var_map = {
@@ -209,7 +209,7 @@ def resolve_env_provider_keys(
         'anthropic': 'ANTHROPIC_API_KEY'
     }
 
-    local_providers = {'piper', 'ollama', 'whisper'}
+    local_providers = {'piper', 'ollama', 'whisper', 'xtts'}
     needed = {asr_provider.lower(), tts_provider.lower(), llm_provider.lower()}
     keys: Dict[str, str] = {}
     missing = []

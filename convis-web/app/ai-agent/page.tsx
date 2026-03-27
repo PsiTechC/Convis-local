@@ -3546,6 +3546,7 @@ export default function AIAgentPage() {
                                 <option value="openai">OpenAI TTS</option>
                                 <option value="sarvam">Sarvam AI (Indian Voices)</option>
                                 <option value="piper">Piper (Offline/Local - Free)</option>
+                                <option value="xtts">XTTS v2 (Local - Natural Voice)</option>
                               </select>
                             </div>
                             <div>
