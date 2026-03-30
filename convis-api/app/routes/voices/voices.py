@@ -684,6 +684,79 @@ VOICE_CATALOG: List[VoiceMetadata] = [
         use_case="General Purpose",
         model="medium"
     ),
+    # XTTS Voices (Local/Offline - Natural)
+    VoiceMetadata(
+        id="Gracie Wise",
+        name="Gracie Wise",
+        provider="xtts",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Natural American female voice for premium local voice agents",
+        age_group="middle-aged",
+        use_case="Voice Agent",
+        model="default"
+    ),
+    VoiceMetadata(
+        id="Tammie Ema",
+        name="Tammie Ema",
+        provider="xtts",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Friendly American female voice with a conversational tone",
+        age_group="young",
+        use_case="General Purpose",
+        model="default"
+    ),
+    VoiceMetadata(
+        id="Luis Moray",
+        name="Luis Moray",
+        provider="xtts",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Warm American male voice for trustworthy customer interactions",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="default"
+    ),
+    VoiceMetadata(
+        id="Damjan Chapman",
+        name="Damjan Chapman",
+        provider="xtts",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Balanced American male voice for natural conversations",
+        age_group="middle-aged",
+        use_case="General Purpose",
+        model="default"
+    ),
+    VoiceMetadata(
+        id="Craig Gutsy",
+        name="Craig Gutsy",
+        provider="xtts",
+        gender="male",
+        accent="American",
+        language="en",
+        description="Professional American male voice with strong clarity",
+        age_group="middle-aged",
+        use_case="Professional",
+        model="default"
+    ),
+    VoiceMetadata(
+        id="Brenda Stern",
+        name="Brenda Stern",
+        provider="xtts",
+        gender="female",
+        accent="American",
+        language="en",
+        description="Confident American female voice suited for support and sales",
+        age_group="middle-aged",
+        use_case="Customer Support",
+        model="default"
+    ),
 ]
 
 
@@ -1367,13 +1440,41 @@ async def generate_piper_demo(voice_id: str, text: str) -> bytes:
         raise
 
 
+async def generate_xtts_demo(voice_id: str, text: str) -> bytes:
+    """Generate voice demo using local XTTS."""
+    try:
+        import io
+        import wave
+
+        from app.services.call_handlers.offline_tts_handler import XttsTTSHandler
+
+        xtts = XttsTTSHandler(voice=voice_id, for_browser=True)
+        pcm_audio = await xtts.synthesize(text)
+
+        if not pcm_audio:
+            raise Exception("XTTS returned empty audio")
+
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(24000)
+            wav_file.writeframes(pcm_audio)
+
+        return wav_buffer.getvalue()
+    except Exception as e:
+        logger.error(f"XTTS demo generation error: {e}")
+        raise
+
+
 # Provider API key name mapping
 PROVIDER_KEY_MAPPING = {
     "openai": "openai",
     "cartesia": "custom",  # Cartesia keys stored as custom
     "elevenlabs": "custom",  # ElevenLabs keys stored as custom
     "sarvam": "custom",  # Sarvam keys stored as custom
-    "piper": "local"  # Piper is local, no key needed
+    "piper": "local",  # Piper is local, no key needed
+    "xtts": "local"  # XTTS is local, no key needed
 }
 
 
@@ -1472,9 +1573,9 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
                 logger.info(f"No user API key found for {request.provider}, trying .env fallback")
 
                 # Piper is local - no API key needed
-                if request.provider == "piper":
+                if request.provider in {"piper", "xtts"}:
                     decrypted_api_key = ""
-                    logger.info("Piper is a local provider, no API key needed")
+                    logger.info("%s is a local provider, no API key needed", request.provider.upper())
                 # Try to get API key from environment variables
                 elif request.provider == "sarvam":
                     decrypted_api_key = settings.sarvam_api_key
@@ -1510,7 +1611,8 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             "openai": "tts-1",
             "cartesia": "sonic-english",
             "elevenlabs": "eleven_turbo_v2_5",
-            "sarvam": "bulbul:v2"
+            "sarvam": "bulbul:v2",
+            "xtts": "default"
         }
 
         # Determine model to use (request model > voice metadata model > default)
@@ -1539,6 +1641,10 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             audio_content = await generate_piper_demo(
                 request.voice_id, request.text
             )
+        elif request.provider == "xtts":
+            audio_content = await generate_xtts_demo(
+                request.voice_id, request.text
+            )
         else:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -1546,8 +1652,8 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             )
 
         # Return audio as response
-        media_type = "audio/wav" if request.provider == "piper" else "audio/mpeg"
-        file_ext = "wav" if request.provider == "piper" else "mp3"
+        media_type = "audio/wav" if request.provider in {"piper", "xtts"} else "audio/mpeg"
+        file_ext = "wav" if request.provider in {"piper", "xtts"} else "mp3"
         return Response(
             content=audio_content,
             media_type=media_type,

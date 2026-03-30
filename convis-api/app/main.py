@@ -320,6 +320,14 @@ async def startup_event():
         except Exception as e:
             logger.warning(f"⚠️ Campaign scheduler failed to start: {e}")
 
+        # 5. Warm XTTS speaker cache so the first XTTS call avoids speaker fetch latency
+        try:
+            from app.services.call_handlers.offline_tts_handler import warm_xtts_speakers
+            speakers = await asyncio.to_thread(warm_xtts_speakers)
+            logger.info("✅ XTTS speaker cache warmed with %d voices", len(speakers))
+        except Exception as e:
+            logger.warning(f"⚠️ XTTS speaker warmup failed: {e}")
+
         logger.info("✅ All background services initialized")
 
     # Launch all initialization in background - don't wait
