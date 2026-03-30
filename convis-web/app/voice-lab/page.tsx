@@ -78,6 +78,13 @@ export default function VoiceLabPage() {
     openai: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-300 dark:border-green-700' },
     sarvam: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-300 dark:border-orange-700' },
     piper: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-300 dark:border-emerald-700' },
+    xtts: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-300 dark:border-cyan-700' },
+  };
+
+  const defaultProviderColors = {
+    bg: 'bg-gray-100 dark:bg-gray-800/60',
+    text: 'text-gray-700 dark:text-gray-300',
+    border: 'border-gray-300 dark:border-gray-700',
   };
 
   // Gender icons
@@ -785,7 +792,7 @@ export default function VoiceLabPage() {
             {filteredVoices.map((voice) => {
               const isSaved = isVoiceSaved(voice.id, voice.provider);
               const isPlaying = currentlyPlaying === voice.id;
-              const colors = providerColors[voice.provider];
+                const colors = providerColors[voice.provider] || defaultProviderColors;
 
               return (
                 <div
