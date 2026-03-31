@@ -3,6 +3,7 @@ Voice library and preferences API routes
 """
 import asyncio
 import httpx
+import os
 from fastapi import APIRouter, HTTPException, status, Response
 from typing import Optional, List
 from bson import ObjectId
@@ -1326,46 +1327,34 @@ async def generate_elevenlabs_demo(voice_id: str, model: str, text: str, api_key
 async def generate_sarvam_demo(voice_id: str, model: str, text: str, api_key: str) -> bytes:
     """Generate voice demo using Sarvam AI API"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.sarvam.ai/text-to-speech",
-                headers={
-                    "api-subscription-key": api_key,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "inputs": [text],
-                    "target_language_code": "hi-IN",
-                    "speaker": voice_id,
-                    "model": model,
-                    "enable_preprocessing": True
-                },
-                timeout=30.0
+        import io
+        import wave
+
+        from app.services.call_handlers.streaming_tts_handler import StreamingSarvamTTS
+
+        sarvam = StreamingSarvamTTS(
+            api_key=api_key,
+            voice=voice_id,
+            model=model,
+            language="hi-IN",
+            for_browser=True
+        )
+        pcm_audio = await sarvam.synthesize(text)
+
+        if not pcm_audio:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid response from Sarvam API"
             )
 
-            if response.status_code != 200:
-                error_msg = f"Sarvam API error: {response.status_code}"
-                try:
-                    error_data = response.json()
-                    error_msg = error_data.get('message', error_msg)
-                except:
-                    pass
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=error_msg
-                )
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(24000)
+            wav_file.writeframes(pcm_audio)
 
-            # Sarvam returns base64 encoded audio in audios array
-            response_data = response.json()
-            if 'audios' in response_data and len(response_data['audios']) > 0:
-                import base64
-                audio_base64 = response_data['audios'][0]
-                return base64.b64decode(audio_base64)
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Invalid response from Sarvam API"
-                )
+        return wav_buffer.getvalue()
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -1416,11 +1405,11 @@ async def generate_openai_demo(voice_id: str, model: str, text: str, api_key: st
 async def generate_piper_demo(voice_id: str, text: str) -> bytes:
     """Generate voice demo using local Piper TTS"""
     try:
-        from app.providers.tts import PiperTTS
         import io
         import wave
+        from app.services.call_handlers.offline_tts_handler import OfflinePiperTTS
 
-        piper = PiperTTS(voice=voice_id)
+        piper = OfflinePiperTTS(voice=voice_id, for_browser=True)
         pcm_audio = await piper.synthesize(text)
 
         if not pcm_audio:
@@ -1431,13 +1420,44 @@ async def generate_piper_demo(voice_id: str, text: str) -> bytes:
         with wave.open(wav_buffer, 'wb') as wav_file:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)
-            wav_file.setframerate(8000)
+            wav_file.setframerate(24000)
             wav_file.writeframes(pcm_audio)
 
         return wav_buffer.getvalue()
     except Exception as e:
         logger.error(f"Piper demo generation error: {e}")
         raise
+
+
+def _get_env_provider_key(provider: str) -> Optional[str]:
+    """Resolve provider API keys from loaded settings or current environment."""
+    provider = provider.lower()
+    key_from_settings = None
+
+    if provider == "sarvam":
+        key_from_settings = settings.sarvam_api_key
+    elif provider == "cartesia":
+        key_from_settings = settings.cartesia_api_key
+    elif provider == "elevenlabs":
+        key_from_settings = settings.elevenlabs_api_key
+    elif provider == "openai":
+        key_from_settings = settings.openai_api_key if hasattr(settings, "openai_api_key") else None
+
+    if key_from_settings and str(key_from_settings).strip():
+        return str(key_from_settings).strip()
+
+    env_var_name = {
+        "sarvam": "SARVAM_API_KEY",
+        "cartesia": "CARTESIA_API_KEY",
+        "elevenlabs": "ELEVENLABS_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }.get(provider)
+
+    if not env_var_name:
+        return None
+
+    env_value = os.getenv(env_var_name)
+    return env_value.strip() if env_value and env_value.strip() else None
 
 
 async def generate_xtts_demo(voice_id: str, text: str) -> bytes:
@@ -1577,14 +1597,8 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
                     decrypted_api_key = ""
                     logger.info("%s is a local provider, no API key needed", request.provider.upper())
                 # Try to get API key from environment variables
-                elif request.provider == "sarvam":
-                    decrypted_api_key = settings.sarvam_api_key
-                elif request.provider == "cartesia":
-                    decrypted_api_key = settings.cartesia_api_key
-                elif request.provider == "elevenlabs":
-                    decrypted_api_key = settings.elevenlabs_api_key
-                elif request.provider == "openai":
-                    decrypted_api_key = settings.openai_api_key if hasattr(settings, 'openai_api_key') else None
+                elif request.provider in {"sarvam", "cartesia", "elevenlabs", "openai"}:
+                    decrypted_api_key = _get_env_provider_key(request.provider)
 
                 if decrypted_api_key is None:
                     provider_name = request.provider.capitalize()
@@ -1605,6 +1619,16 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to decrypt API key"
                 )
+
+        if request.provider in {"sarvam", "cartesia", "elevenlabs", "openai"} and not (decrypted_api_key and decrypted_api_key.strip()):
+            decrypted_api_key = _get_env_provider_key(request.provider)
+
+        if request.provider in {"sarvam", "cartesia", "elevenlabs", "openai"} and not decrypted_api_key:
+            provider_name = request.provider.capitalize()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No {provider_name} API key found. Please add a {provider_name} API key in Settings (as 'Custom Provider') or configure it in .env file."
+            )
 
         # Default models per provider
         default_models = {
@@ -1652,8 +1676,8 @@ async def generate_universal_voice_demo(request: UniversalVoiceDemoRequest):
             )
 
         # Return audio as response
-        media_type = "audio/wav" if request.provider in {"piper", "xtts"} else "audio/mpeg"
-        file_ext = "wav" if request.provider in {"piper", "xtts"} else "mp3"
+        media_type = "audio/wav" if request.provider in {"piper", "xtts", "sarvam"} else "audio/mpeg"
+        file_ext = "wav" if request.provider in {"piper", "xtts", "sarvam"} else "mp3"
         return Response(
             content=audio_content,
             media_type=media_type,
