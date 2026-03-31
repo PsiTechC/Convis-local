@@ -790,6 +790,26 @@ Default timezone: {timezone_hint}"""
                     "tool_execution_timeout": assistant.get("tool_execution_timeout", 30),
                 }
 
+                # Sarvam ASR is handled by the general custom provider stream path.
+                # The optimized handler currently supports Whisper offline ASR and
+                # Deepgram-style streaming assumptions, so bypass it for Sarvam.
+                asr_provider = assistant_config.get("asr_provider", "deepgram").lower()
+                if asr_provider == "sarvam":
+                    logger.info("[OUTBOUND] 🔀 Routing Sarvam ASR to CustomProviderStreamHandler")
+                    from app.services.call_handlers.custom_provider_stream import CustomProviderStreamHandler
+
+                    handler = CustomProviderStreamHandler(
+                        websocket=websocket,
+                        assistant_config=assistant_config,
+                        openai_api_key=provider_keys.get("openai"),
+                        call_id="twilio_custom_provider_call",
+                        platform="twilio",
+                        provider_keys=provider_keys
+                    )
+                    await handler.handle_stream()
+                    logger.info("[OUTBOUND] ✅ Custom provider stream completed for Sarvam ASR")
+                    return
+
                 # Check streaming mode: "ultra" for word-by-word, "optimized" for sentence-by-sentence
                 streaming_mode = assistant.get("streaming_mode", "optimized")
                 tts_provider = assistant_config.get("tts_provider", "elevenlabs").lower()
