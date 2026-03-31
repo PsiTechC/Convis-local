@@ -187,6 +187,7 @@ class CustomProviderStreamHandler:
 
         # Add language instruction to system message if not English
         self.bot_language = assistant_config.get('bot_language', 'en')
+        self.sarvam_language = self._normalize_sarvam_language(self.bot_language)
         self.language_names = {
             'hi': 'Hindi', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
             'pt': 'Portuguese', 'it': 'Italian', 'ja': 'Japanese', 'ko': 'Korean',
@@ -309,6 +310,53 @@ class CustomProviderStreamHandler:
                 alert_callback=self._on_quality_alert
             )
             logger.info(f"[CUSTOM] 📊 Call quality monitoring enabled")
+
+    @staticmethod
+    def _normalize_sarvam_language(language: Optional[str]) -> str:
+        """Convert generic assistant language codes into Sarvam locale codes."""
+        if not language or not str(language).strip():
+            return "en-IN"
+
+        cleaned = str(language).strip()
+        mapping = {
+            "as": "as-IN",
+            "bn": "bn-IN",
+            "brx": "brx-IN",
+            "doi": "doi-IN",
+            "en": "en-IN",
+            "gu": "gu-IN",
+            "hi": "hi-IN",
+            "kn": "kn-IN",
+            "kok": "kok-IN",
+            "ks": "ks-IN",
+            "mai": "mai-IN",
+            "ml": "ml-IN",
+            "mni": "mni-IN",
+            "mr": "mr-IN",
+            "ne": "ne-IN",
+            "od": "od-IN",
+            "pa": "pa-IN",
+            "sa": "sa-IN",
+            "sat": "sat-IN",
+            "sd": "sd-IN",
+            "ta": "ta-IN",
+            "te": "te-IN",
+            "ur": "ur-IN",
+        }
+
+        if cleaned in mapping.values():
+            return cleaned
+
+        lowered = cleaned.lower().replace("_", "-")
+        if lowered in mapping:
+            return mapping[lowered]
+
+        for valid in mapping.values():
+            if lowered == valid.lower():
+                return valid
+
+        logger.warning("[CUSTOM] Unsupported Sarvam language '%s', defaulting to en-IN", language)
+        return "en-IN"
 
     def _on_quality_alert(self, alert: QualityAlert):
         """Handle quality alerts during the call"""
@@ -440,7 +488,7 @@ class CustomProviderStreamHandler:
                 tts_kwargs = {}
                 if self.tts_provider_name == 'sarvam':
                     # Sarvam needs language parameter
-                    tts_kwargs['language'] = self.language or 'hi-IN'
+                    tts_kwargs['language'] = self.sarvam_language
                     logger.info(f"[CUSTOM]   └─ Sarvam language: {tts_kwargs['language']}")
 
                 self.tts_provider = ProviderFactory.create_tts_provider(
