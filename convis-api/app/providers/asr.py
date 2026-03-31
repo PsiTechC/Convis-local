@@ -4,6 +4,8 @@ ASR (Automatic Speech Recognition) Provider Abstraction
 
 import logging
 import asyncio
+import io
+import wave
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Optional
 import os
@@ -366,33 +368,46 @@ class SarvamASR(ASRProvider):
     async def transcribe(self, audio_bytes: bytes) -> str:
         """Transcribe complete audio using Sarvam API"""
         import aiohttp
-        import base64
 
         try:
             headers = {
                 "api-subscription-key": self.api_key,
-                "Content-Type": "application/json"
+                "api-key": self.api_key,
+                "x-api-key": self.api_key,
+                "Authorization": f"Bearer {self.api_key}",
             }
 
-            # Sarvam expects base64 encoded audio
-            audio_b64 = base64.b64encode(audio_bytes).decode()
+            # Twilio/custom handlers pass raw 8kHz mono PCM. Wrap it in a WAV
+            # container because Sarvam expects multipart file uploads.
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(8000)
+                wav_file.writeframes(audio_bytes)
+            wav_buffer.seek(0)
 
-            payload = {
-                "audio": audio_b64,
-                "model": self.model,
-                "language_code": self.language
-            }
+            form = aiohttp.FormData()
+            form.add_field(
+                "file",
+                wav_buffer,
+                filename="audio.wav",
+                content_type="audio/wav",
+            )
+            form.add_field("model", self.model)
+            if self.language not in ("auto", "", None):
+                form.add_field("language_code", self.language)
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.base_url}/speech-to-text",
                     headers=headers,
-                    json=payload,
+                    data=form,
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        return result.get("transcript", "")
+                        return (result.get("transcript") or result.get("text") or "").strip()
                     else:
                         error_text = await response.text()
                         self.logger.error(f"Sarvam API error: {response.status} - {error_text}")
