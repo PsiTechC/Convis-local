@@ -224,6 +224,32 @@ class StreamingSarvamTTS:
         "hitesh": "hitesh"
     }
 
+    LANGUAGE_MAP = {
+        "as": "as-IN",
+        "bn": "bn-IN",
+        "brx": "brx-IN",
+        "doi": "doi-IN",
+        "en": "en-IN",
+        "gu": "gu-IN",
+        "hi": "hi-IN",
+        "kn": "kn-IN",
+        "kok": "kok-IN",
+        "ks": "ks-IN",
+        "mai": "mai-IN",
+        "ml": "ml-IN",
+        "mni": "mni-IN",
+        "mr": "mr-IN",
+        "ne": "ne-IN",
+        "od": "od-IN",
+        "pa": "pa-IN",
+        "sa": "sa-IN",
+        "sat": "sat-IN",
+        "sd": "sd-IN",
+        "ta": "ta-IN",
+        "te": "te-IN",
+        "ur": "ur-IN",
+    }
+
     def __init__(
         self,
         api_key: str,
@@ -235,9 +261,39 @@ class StreamingSarvamTTS:
         self.api_key = api_key
         self.voice = self.VOICES.get(voice.lower(), voice)
         self.model = model
-        self.language = language
+        self.language = self._normalize_language(language)
         self.for_browser = for_browser
         self.api_url = "https://api.sarvam.ai/text-to-speech"
+
+    @classmethod
+    def _normalize_language(cls, language: Optional[str]) -> str:
+        """
+        Normalize generic app language codes like 'en' or 'hi'
+        into Sarvam's required locale format like 'en-IN' or 'hi-IN'.
+        """
+        if not language or not str(language).strip():
+            return "hi-IN"
+
+        cleaned = str(language).strip()
+
+        if cleaned in cls.LANGUAGE_MAP.values():
+            return cleaned
+
+        lowered = cleaned.lower()
+        if lowered in cls.LANGUAGE_MAP:
+            return cls.LANGUAGE_MAP[lowered]
+
+        # Handle values like en-in / hi-in from UI or stored configs
+        normalized_locale = lowered.replace("_", "-")
+        for valid in cls.LANGUAGE_MAP.values():
+            if normalized_locale == valid.lower():
+                return valid
+
+        logger.warning(
+            "[SARVAM_TTS] Unsupported language '%s', falling back to en-IN",
+            language
+        )
+        return "en-IN"
 
     async def synthesize(self, text: str) -> bytes:
         """
@@ -382,4 +438,3 @@ class StreamingCartesiaTTS:
         except Exception as e:
             logger.error(f"[CARTESIA_TTS] ❌ Synthesis error: {e}", exc_info=True)
             return bytes()
-
