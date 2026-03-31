@@ -378,7 +378,8 @@ class OfflineWhisperASR:
             form = aiohttp.FormData()
             form.add_field('file', wav_buffer, filename='audio.wav', content_type='audio/wav')
             form.add_field('model', self.model_size)  # Uses the model selected in assistant settings
-            form.add_field('language', self.language if self.language not in ("auto", "") else "en")
+            if self.language not in ("auto", "", None):
+                form.add_field('language', self.language)
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
