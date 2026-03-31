@@ -358,6 +358,33 @@ class CustomProviderStreamHandler:
         logger.warning("[CUSTOM] Unsupported Sarvam language '%s', defaulting to en-IN", language)
         return "en-IN"
 
+    def _get_default_llm_model(self) -> str:
+        """Return the default model for the configured LLM provider."""
+        if self.llm_provider == "ollama":
+            return "llama3.2:3b"
+        if self.llm_provider == "anthropic":
+            return "claude-3-5-sonnet-20241022"
+        if self.llm_provider == "groq":
+            return "llama-3.3-70b-versatile"
+        return "gpt-4o-mini"
+
+    def _get_tts_audio_profile(self) -> tuple[int, bool, bool]:
+        """
+        Describe the audio format returned by the current TTS provider.
+
+        Returns:
+            source_sample_rate, is_wav_container, is_twilio_ready_mulaw
+        """
+        if self.tts_provider_name == 'elevenlabs':
+            return 16000, False, False
+        if self.tts_provider_name == 'openai':
+            return 24000, False, False
+        if self.tts_provider_name == 'sarvam':
+            return 8000, True, False
+        if self.tts_provider_name in {'piper', 'xtts'}:
+            return 8000, False, True
+        return 8000, False, False
+
     def _on_quality_alert(self, alert: QualityAlert):
         """Handle quality alerts during the call"""
         logger.warning(f"[QUALITY] {alert.severity.upper()}: {alert.message}")
@@ -491,12 +518,25 @@ class CustomProviderStreamHandler:
                     tts_kwargs['language'] = self.sarvam_language
                     logger.info(f"[CUSTOM]   └─ Sarvam language: {tts_kwargs['language']}")
 
-                self.tts_provider = ProviderFactory.create_tts_provider(
-                    provider_name=self.tts_provider_name,
-                    api_key=tts_api_key,
-                    voice=self.tts_voice or self.voice,
-                    **tts_kwargs
-                )
+                if self.tts_provider_name == 'piper':
+                    from .offline_tts_handler import OfflinePiperTTS
+                    self.tts_provider = OfflinePiperTTS(
+                        voice=self.tts_voice or self.voice or "en_US-lessac-medium",
+                        for_browser=False
+                    )
+                elif self.tts_provider_name == 'xtts':
+                    from .offline_tts_handler import XttsTTSHandler
+                    self.tts_provider = XttsTTSHandler(
+                        voice=self.tts_voice or self.voice or "Gracie Wise",
+                        for_browser=False
+                    )
+                else:
+                    self.tts_provider = ProviderFactory.create_tts_provider(
+                        provider_name=self.tts_provider_name,
+                        api_key=tts_api_key,
+                        voice=self.tts_voice or self.voice,
+                        **tts_kwargs
+                    )
                 logger.info(f"[CUSTOM] ✅ TTS provider initialized: {self.tts_provider_name}/{tts_model or 'default'} (voice: {self.tts_voice or self.voice})")
             except Exception as tts_error:
                 logger.error(f"[CUSTOM] ❌ Failed to initialize TTS provider '{self.tts_provider_name}': {tts_error}", exc_info=True)
@@ -528,6 +568,17 @@ class CustomProviderStreamHandler:
                     logger.info(f"[CUSTOM] ✅ LLM initialized: openai/{self.llm_model or 'gpt-4o-mini'}")
                 except Exception as openai_error:
                     logger.error(f"[CUSTOM] ❌ Failed to initialize OpenAI LLM client: {openai_error}", exc_info=True)
+            elif self.llm_provider == "ollama":
+                try:
+                    import openai
+                    ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/v1")
+                    self.llm_client = openai.AsyncOpenAI(base_url=ollama_base_url, api_key="ollama")
+                    if not self.llm_model:
+                        self.llm_model = "llama3.2:3b"
+                    llm_initialized = True
+                    logger.info(f"[CUSTOM] [OK] LLM initialized: ollama/{self.llm_model} @ {ollama_base_url}")
+                except Exception as ollama_error:
+                    logger.error(f"[CUSTOM] [ERROR] Failed to initialize Ollama LLM client: {ollama_error}", exc_info=True)
             elif self.llm_provider == "anthropic":
                 try:
                     import anthropic
@@ -689,7 +740,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             ]
 
             # Determine model to use
-            llm_model = self.llm_model or "gpt-4o-mini"
+            llm_model = self.llm_model or self._get_default_llm_model()
 
             # Use non-streaming for faster warmup (we don't care about the response)
             response = await self.llm_client.chat.completions.create(
@@ -724,17 +775,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             greeting_audio = await self.tts_provider.synthesize(self.greeting)
 
             if greeting_audio and len(greeting_audio) > 0:
-                # Determine input sample rate based on TTS provider
-                input_sample_rate = 8000  # Default for Cartesia
-                is_wav_format = False
-
-                if self.tts_provider_name == 'elevenlabs':
-                    input_sample_rate = 16000
-                elif self.tts_provider_name == 'openai':
-                    input_sample_rate = 24000
-                elif self.tts_provider_name == 'sarvam':
-                    input_sample_rate = 8000
-                    is_wav_format = True
+                input_sample_rate, is_wav_format, is_twilio_ready_mulaw = self._get_tts_audio_profile()
 
                 # Extract PCM from WAV if needed
                 if is_wav_format:
@@ -744,19 +785,19 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
                     except Exception as wav_error:
                         logger.error(f"[CUSTOM] WAV extraction failed: {wav_error}")
 
-                # Resample to 8kHz if needed
-                if input_sample_rate != 8000:
-                    try:
-                        greeting_audio, _ = audioop.ratecv(greeting_audio, 2, 1, input_sample_rate, 8000, None)
-                    except Exception as conv_error:
-                        logger.warning(f"[CUSTOM] Audio resampling failed: {conv_error}")
+                if not is_twilio_ready_mulaw:
+                    if input_sample_rate != 8000:
+                        try:
+                            greeting_audio, _ = audioop.ratecv(greeting_audio, 2, 1, input_sample_rate, 8000, None)
+                        except Exception as conv_error:
+                            logger.warning(f"[CUSTOM] Audio resampling failed: {conv_error}")
 
-                # Encode to μ-law for Twilio
-                if self.platform == "twilio":
-                    try:
-                        greeting_audio = audioop.lin2ulaw(greeting_audio, 2)
-                    except Exception as enc_error:
-                        logger.error(f"[CUSTOM] μ-law encoding failed: {enc_error}")
+                    if self.platform == "twilio":
+                        try:
+                            greeting_audio = audioop.lin2ulaw(greeting_audio, 2)
+                        except Exception as enc_error:
+                            logger.error(f"[CUSTOM] Mu-law encoding failed: {enc_error}")
+
 
                 # Cache the pre-processed audio
                 self.greeting_audio_cache = greeting_audio
@@ -1141,57 +1182,47 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             self.metrics["total_times"].append(total_time)
 
             # Convert audio format if needed
-            logger.info(f"[CUSTOM] 🔄 Converting audio format...")
-            # Determine input sample rate based on TTS provider
-            input_sample_rate = 8000  # Default for Cartesia
-            is_wav_format = False  # Flag for WAV-encoded audio
+            logger.info(f"[CUSTOM] Converting audio format...")
+            input_sample_rate, is_wav_format, is_twilio_ready_mulaw = self._get_tts_audio_profile()
 
-            if self.tts_provider_name == 'elevenlabs':
-                input_sample_rate = 16000
-            elif self.tts_provider_name == 'openai':
-                input_sample_rate = 24000  # OpenAI TTS outputs 24kHz
-            elif self.tts_provider_name == 'sarvam':
-                # Sarvam returns WAV format @ 8kHz
-                input_sample_rate = 8000
-                is_wav_format = True
+            logger.info(f"[CUSTOM]   Input sample rate: {input_sample_rate}Hz, Target: 8000Hz (Twilio requirement)")
+            logger.info(f"[CUSTOM]   Is WAV format: {is_wav_format}")
+            logger.info(f"[CUSTOM]   Telephony-ready audio: {is_twilio_ready_mulaw}")
 
-            logger.info(f"[CUSTOM]   └─ Input sample rate: {input_sample_rate}Hz, Target: 8000Hz (Twilio requirement)")
-            logger.info(f"[CUSTOM]   └─ Is WAV format: {is_wav_format}")
-
-            # Step 0: Extract PCM from WAV if needed (for Sarvam)
             if is_wav_format:
                 try:
                     from app.voice_pipeline.helpers.utils import wav_bytes_to_pcm
-                    logger.info(f"[CUSTOM]   └─ Extracting PCM from WAV container...")
+                    logger.info(f"[CUSTOM]   Extracting PCM from WAV container...")
                     response_audio = wav_bytes_to_pcm(response_audio)
-                    logger.info(f"[CUSTOM] ✅ Extracted PCM: {len(response_audio)} bytes")
+                    logger.info(f"[CUSTOM] Extracted PCM: {len(response_audio)} bytes")
                 except Exception as wav_error:
-                    logger.error(f"[CUSTOM] ❌ WAV extraction failed: {wav_error}")
+                    logger.error(f"[CUSTOM] WAV extraction failed: {wav_error}")
 
-            # Step 1: Resample to 8kHz if needed
-            if input_sample_rate != 8000:
-                try:
-                    logger.info(f"[CUSTOM]   └─ Resampling from {input_sample_rate}Hz to 8000Hz...")
-                    converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
-                    logger.info(f"[CUSTOM] ✅ Resampled audio: {len(converted_audio)} bytes")
-                except Exception as conv_error:
-                    logger.error(f"[CUSTOM] ❌ Audio resampling failed: {conv_error}")
+            if not is_twilio_ready_mulaw:
+                if input_sample_rate != 8000:
+                    try:
+                        logger.info(f"[CUSTOM]   Resampling from {input_sample_rate}Hz to 8000Hz...")
+                        converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
+                        logger.info(f"[CUSTOM] Resampled audio: {len(converted_audio)} bytes")
+                    except Exception as conv_error:
+                        logger.error(f"[CUSTOM] Audio resampling failed: {conv_error}")
+                        converted_audio = response_audio
+                else:
+                    logger.info(f"[CUSTOM]   No resampling needed (already 8kHz)")
                     converted_audio = response_audio
+
+                if self.platform == "twilio":
+                    try:
+                        logger.info(f"[CUSTOM]   Converting PCM to mu-law for Twilio...")
+                        converted_audio = audioop.lin2ulaw(converted_audio, 2)
+                        logger.info(f"[CUSTOM] Encoded to mu-law: {len(converted_audio)} bytes")
+                    except Exception as enc_error:
+                        logger.error(f"[CUSTOM] mu-law encoding failed: {enc_error}")
+                        converted_audio = response_audio
             else:
-                logger.info(f"[CUSTOM]   └─ No resampling needed (already 8kHz)")
                 converted_audio = response_audio
 
-            # Step 2: Encode to μ-law for Twilio, keep PCM for FreJun
-            if self.platform == "twilio":
-                try:
-                    logger.info(f"[CUSTOM]   └─ Converting PCM to μ-law for Twilio...")
-                    # Convert PCM to μ-law (G.711) for Twilio
-                    converted_audio = audioop.lin2ulaw(converted_audio, 2)
-                    logger.info(f"[CUSTOM] ✅ Encoded to μ-law: {len(converted_audio)} bytes")
-                except Exception as enc_error:
-                    logger.error(f"[CUSTOM] ❌ μ-law encoding failed: {enc_error}")
-                    # Fall back to PCM (won't work but at least won't crash)
-                    pass
+            # Send audio back to caller
 
             # Send audio in platform-specific format
             logger.info(f"[CUSTOM] 📤 === SENDING AUDIO TO {self.platform.upper()} ===")
@@ -1281,17 +1312,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
                 logger.error("[CUSTOM] ❌ Failed to synthesize conflict response")
                 return
 
-            # Determine input sample rate based on TTS provider
-            input_sample_rate = 8000
-            is_wav_format = False
-
-            if self.tts_provider_name == 'elevenlabs':
-                input_sample_rate = 16000
-            elif self.tts_provider_name == 'openai':
-                input_sample_rate = 24000
-            elif self.tts_provider_name == 'sarvam':
-                input_sample_rate = 8000
-                is_wav_format = True
+            input_sample_rate, is_wav_format, is_twilio_ready_mulaw = self._get_tts_audio_profile()
 
             # Extract PCM from WAV if needed
             if is_wav_format:
@@ -1301,21 +1322,22 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
                 except Exception as wav_error:
                     logger.error(f"[CUSTOM] WAV extraction failed: {wav_error}")
 
-            # Resample to 8kHz if needed
-            if input_sample_rate != 8000:
-                try:
-                    converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
-                except Exception:
+            if not is_twilio_ready_mulaw:
+                if input_sample_rate != 8000:
+                    try:
+                        converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
+                    except Exception:
+                        converted_audio = response_audio
+                else:
                     converted_audio = response_audio
+
+                if self.platform == "twilio":
+                    try:
+                        converted_audio = audioop.lin2ulaw(converted_audio, 2)
+                    except Exception:
+                        pass
             else:
                 converted_audio = response_audio
-
-            # Encode for platform
-            if self.platform == "twilio":
-                try:
-                    converted_audio = audioop.lin2ulaw(converted_audio, 2)
-                except Exception:
-                    pass
 
             # Send audio
             if self.platform == "frejun":
@@ -1354,14 +1376,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             llm_model = self.llm_model
             if not llm_model:
                 # Default models based on provider
-                if self.llm_provider == "openai":
-                    llm_model = "gpt-4o-mini"
-                elif self.llm_provider == "anthropic":
-                    llm_model = "claude-3-5-sonnet-20241022"
-                elif self.llm_provider == "groq":
-                    llm_model = "llama-3.3-70b-versatile"
-                else:
-                    llm_model = "gpt-4o-mini"
+                llm_model = self._get_default_llm_model()
 
             # Prepare tools if enabled
             tools = None
@@ -1489,7 +1504,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
 
         try:
             messages = self.conversation_history[-10:]
-            llm_model = self.llm_model or "gpt-4o-mini"
+            llm_model = self.llm_model or self._get_default_llm_model()
 
             logger.info(f"[CUSTOM] ⚡ Starting streaming LLM response...")
 
@@ -1572,18 +1587,8 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             logger.debug(f"[CUSTOM] ⚡ TTS synthesized in {tts_time:.0f}ms ({len(response_audio)} bytes)")
 
             # Convert audio format
-            input_sample_rate = 8000
-            is_wav_format = False
+            input_sample_rate, is_wav_format, is_twilio_ready_mulaw = self._get_tts_audio_profile()
 
-            if self.tts_provider_name == 'elevenlabs':
-                input_sample_rate = 16000
-            elif self.tts_provider_name == 'openai':
-                input_sample_rate = 24000
-            elif self.tts_provider_name == 'sarvam':
-                input_sample_rate = 8000
-                is_wav_format = True
-
-            # Extract PCM from WAV if needed
             if is_wav_format:
                 try:
                     from app.voice_pipeline.helpers.utils import wav_bytes_to_pcm
@@ -1591,21 +1596,22 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
                 except Exception as wav_error:
                     logger.error(f"[CUSTOM] WAV extraction failed: {wav_error}")
 
-            # Resample to 8kHz if needed
-            if input_sample_rate != 8000:
-                try:
-                    converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
-                except Exception:
+            if not is_twilio_ready_mulaw:
+                if input_sample_rate != 8000:
+                    try:
+                        converted_audio, _ = audioop.ratecv(response_audio, 2, 1, input_sample_rate, 8000, None)
+                    except Exception:
+                        converted_audio = response_audio
+                else:
                     converted_audio = response_audio
+
+                if self.platform == "twilio":
+                    try:
+                        converted_audio = audioop.lin2ulaw(converted_audio, 2)
+                    except Exception:
+                        pass
             else:
                 converted_audio = response_audio
-
-            # Encode for platform
-            if self.platform == "twilio":
-                try:
-                    converted_audio = audioop.lin2ulaw(converted_audio, 2)
-                except Exception:
-                    pass
 
             # Send audio
             if self.platform == "frejun":
@@ -1637,7 +1643,7 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
         
         try:
             messages = self.conversation_history[-10:]
-            llm_model = self.llm_model or "gpt-4o-mini"
+            llm_model = self.llm_model or self._get_default_llm_model()
             
             response = await self.llm_client.chat.completions.create(
                 model=llm_model,
