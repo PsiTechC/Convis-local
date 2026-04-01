@@ -44,85 +44,44 @@ else:
 
 def detect_language_from_text(text: str) -> str:
     """
-    Detect language from text using heuristics, character patterns, and
-    romanized keyword matching. Returns ISO language code (e.g., 'en', 'hi').
+    Detect whether user is speaking English or Hindi.
+    Returns 'hi' for Hindi, 'en' for English (default).
 
-    Handles both native-script AND romanized speech (e.g., Sarvam ASR outputs
-    romanized Hindi like "mujhe appointment chahiye" instead of Devanagari).
+    Handles:
+    - Devanagari script (from Whisper ASR)
+    - Romanized Hindi (from Sarvam ASR, e.g., "mujhe appointment chahiye")
     """
     if not text or len(text.strip()) < 3:
-        return 'en'  # Default to English for very short text
+        return 'en'
 
-    text_lower = text.lower().strip()
-
-    # ── Script-based detection (highest confidence) ──────────────────────
-    # Hindi / Devanagari script
+    # Devanagari script → Hindi (Whisper outputs this)
     if any('\u0900' <= char <= '\u097F' for char in text):
         return 'hi'
 
-    # Arabic script
-    if any('\u0600' <= char <= '\u06FF' for char in text):
-        return 'ar'
-
-    # Chinese characters
-    if any('\u4e00' <= char <= '\u9fff' for char in text):
-        return 'zh'
-
-    # Japanese (Hiragana / Katakana)
-    if any('\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff' for char in text):
-        return 'ja'
-
-    # Korean (Hangul)
-    if any('\uac00' <= char <= '\ud7af' for char in text):
-        return 'ko'
-
-    # ── Romanized Hindi detection (for Sarvam ASR output) ────────────────
-    # Common Hindi words that appear in romanized transcription
-    hindi_words = [
+    # Romanized Hindi detection (Sarvam ASR outputs this)
+    hindi_words = {
         'namaste', 'namaskar', 'haan', 'nahi', 'nhi', 'kya', 'kaise', 'kaisa',
         'acha', 'accha', 'theek', 'thik', 'shukriya', 'dhanyavaad', 'dhanyawad',
         'mujhe', 'mujhko', 'humko', 'humein', 'aapko', 'aapka', 'aapki',
-        'kripya', 'please', 'batao', 'bataye', 'bataiye', 'bolo', 'boliye',
+        'kripya', 'batao', 'bataye', 'bataiye', 'bolo', 'boliye',
         'chahiye', 'chahte', 'chahti', 'karenge', 'karunga', 'karungi',
         'karna', 'karo', 'kariye', 'karke', 'kijiye', 'dijiye',
-        'appointment', 'samay', 'waqt', 'kal', 'aaj', 'parso',
-        'abhi', 'baad', 'pehle', 'phir', 'lekin', 'aur', 'ya', 'ki', 'ka',
-        'hai', 'hain', 'tha', 'thi', 'the', 'hoga', 'hogi', 'honge',
-        'mein', 'se', 'ko', 'pe', 'par', 'ke', 'wala', 'wali', 'wale',
+        'samay', 'waqt', 'kal', 'aaj', 'parso',
+        'abhi', 'baad', 'pehle', 'phir', 'lekin', 'aur',
+        'hai', 'hain', 'tha', 'thi', 'hoga', 'hogi', 'honge',
+        'mein', 'wala', 'wali', 'wale',
         'yeh', 'woh', 'kahan', 'kidhar', 'kab', 'kyun', 'kyon', 'kaun',
         'suniye', 'sunna', 'samjha', 'samjhe', 'pata', 'maloom',
         'bahut', 'bohot', 'zyada', 'thoda', 'bilkul', 'zaroor',
-        'ji', 'sahab', 'bhai', 'didi', 'madam', 'sir',
-    ]
+        'ji', 'sahab', 'bhai', 'didi',
+    }
 
-    # Split into words and count Hindi word matches
-    words = text_lower.split()
+    words = text.lower().strip().split()
     hindi_count = sum(1 for w in words if w.strip('.,!?') in hindi_words)
 
-    # If 2+ Hindi words or >30% of words are Hindi → detect as Hindi
+    # 2+ Hindi words or >30% of words are Hindi → Hindi
     if hindi_count >= 2 or (len(words) > 0 and hindi_count / len(words) > 0.3):
         return 'hi'
-
-    # ── European language detection ──────────────────────────────────────
-    spanish_words = ['hola', 'gracias', 'por favor', 'sí', 'cómo', 'qué', 'dónde', 'cuándo']
-    if any(word in text_lower for word in spanish_words):
-        return 'es'
-
-    french_words = ['bonjour', 'merci', "s'il vous plaît", 'oui', 'comment', 'quoi', 'où', 'quand']
-    if any(word in text_lower for word in french_words):
-        return 'fr'
-
-    german_words = ['hallo', 'danke', 'bitte', 'ja', 'nein', 'wie', 'was', 'wo', 'wann']
-    if any(word in text_lower for word in german_words):
-        return 'de'
-
-    portuguese_words = ['olá', 'obrigado', 'sim', 'não', 'como', 'onde', 'quando']
-    if any(word in text_lower for word in portuguese_words):
-        return 'pt'
-
-    italian_words = ['ciao', 'grazie', 'per favore', 'come', 'cosa', 'dove']
-    if any(word in text_lower for word in italian_words):
-        return 'it'
 
     # Default to English
     return 'en'

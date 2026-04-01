@@ -357,6 +357,14 @@ class SarvamASR(ASRProvider):
         )
         self.base_url = "https://api.sarvam.ai"
 
+    # All language codes Sarvam API actually accepts
+    SUPPORTED_LOCALES = {
+        "unknown", "hi-IN", "bn-IN", "kn-IN", "ml-IN", "mr-IN", "od-IN",
+        "pa-IN", "ta-IN", "te-IN", "en-IN", "gu-IN", "as-IN", "ur-IN",
+        "ne-IN", "kok-IN", "ks-IN", "sd-IN", "sa-IN", "sat-IN", "mni-IN",
+        "brx-IN", "mai-IN", "doi-IN",
+    }
+
     def set_language(self, language: str):
         """Update ASR language for next transcription (called on mid-call language switch)."""
         old = self.language
@@ -364,6 +372,10 @@ class SarvamASR(ASRProvider):
         # Accept full locale codes as-is (e.g., "hi-IN")
         if "-" in language and language not in self.LANGUAGE_MAP:
             normalized = language
+        # Only set if Sarvam supports this language, otherwise use 'unknown' for auto-detect
+        if normalized not in self.SUPPORTED_LOCALES:
+            self.logger.warning(f"[SARVAM_ASR] Language '{normalized}' not supported by Sarvam, using 'unknown'")
+            normalized = "unknown"
         self.language = normalized
         self.logger.info(f"[SARVAM_ASR] Language switched: {old} → {self.language}")
 
@@ -418,8 +430,10 @@ class SarvamASR(ASRProvider):
                 content_type="audio/wav",
             )
             form.add_field("model", self.model)
-            if self.language not in ("auto", "", None):
-                form.add_field("language_code", self.language)
+            # Only send language_code if it's a valid Sarvam locale
+            if self.language and self.language not in ("auto", ""):
+                lang_to_send = self.language if self.language in self.SUPPORTED_LOCALES else "unknown"
+                form.add_field("language_code", lang_to_send)
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(

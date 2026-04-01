@@ -102,8 +102,7 @@ export const ENHANCED_ASR_MODELS = {
     { value: 'whisper-1', label: 'Whisper-1 (General Purpose)', cost: 0.006, latency: 250, costPerMin: 0.006 }
   ],
   sarvam: [
-    { value: 'saarika:v1', label: 'Saarika V1 (Indian Languages)', cost: 0.004, latency: 120, costPerMin: 0.004 },
-    { value: 'saarika:v2', label: 'Saarika V2 (Improved)', cost: 0.005, latency: 110, costPerMin: 0.005 }
+    { value: 'saarika:v2.5', label: 'Saarika V2.5 (Latest)', cost: 0.005, latency: 110, costPerMin: 0.005 }
   ],
   google: [
     { value: 'default', label: 'Google Speech-to-Text Standard', cost: 0.006, latency: 130, costPerMin: 0.006 },
