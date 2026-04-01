@@ -1036,15 +1036,18 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
 
             # 🌍 AUTOMATIC LANGUAGE DETECTION & SWITCHING
             detected_language = detect_language_from_text(transcript)
-            if detected_language != self.bot_language:
-                logger.info(f"[CUSTOM] 🌍 Language switch detected: {self.bot_language} → {detected_language}")
-                logger.info(f"[CUSTOM] 🌍 User is now speaking in: {detected_language.upper()}")
 
-                # Update bot language for responses
-                old_language = self.bot_language
+            # Normalize bot_language: treat 'auto'/empty as 'en' (default to English)
+            effective_bot_language = self.bot_language if self.bot_language not in ('auto', 'Auto-detect', '', None) else 'en'
+
+            # Only switch when the user actually changes language (en ↔ hi)
+            if detected_language != effective_bot_language:
+                logger.info(f"[CUSTOM] 🌍 Language switch detected: {effective_bot_language} → {detected_language}")
+
+                old_language = effective_bot_language
                 self.bot_language = detected_language
 
-                # Update ASR language for better future transcriptions (if ASR supports it)
+                # Update ASR language for better future transcriptions
                 if hasattr(self.asr_provider, 'set_language'):
                     self.asr_provider.set_language(detected_language)
                     logger.info(f"[CUSTOM] 🌍 Updated ASR language to: {detected_language}")
@@ -1055,27 +1058,26 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
                     old_tts_lang = self.tts_provider.language
                     self.tts_provider.language = sarvam_lang
                     logger.info(f"[CUSTOM] 🌍 Updated TTS language: {old_tts_lang} → {sarvam_lang}")
-                # Also update the stored sarvam_language for consistency
                 self.sarvam_language = self._normalize_sarvam_language(detected_language)
 
                 # Update system message to reflect new language
                 language_name = self.language_names.get(self.bot_language, self.bot_language.upper())
                 if self.bot_language != 'en':
-                    # Add language instruction to system message
                     base_system_message = self.system_message.split("\n\nIMPORTANT: You MUST speak")[0]
                     self.system_message = f"{base_system_message}\n\nIMPORTANT: You MUST speak and respond ONLY in {language_name}. All your responses should be in {language_name} language."
                     logger.info(f"[CUSTOM] 🌍 Updated system message for {language_name} responses")
                 else:
-                    # Remove language instruction for English
                     self.system_message = self.system_message.split("\n\nIMPORTANT: You MUST speak")[0]
                     logger.info(f"[CUSTOM] 🌍 Switched back to English - removed language instruction")
 
-                # Update the system message in conversation history
                 if len(self.conversation_history) > 0 and self.conversation_history[0].get('role') == 'system':
                     self.conversation_history[0]['content'] = self.system_message
-                    logger.info(f"[CUSTOM] 🌍 Updated system message in conversation history")
 
                 logger.info(f"[CUSTOM] 🌍 ✅ Language switched from {old_language} to {detected_language}")
+            elif self.bot_language in ('auto', 'Auto-detect', '', None):
+                # First transcript with auto-detect — set bot_language without triggering a "switch"
+                self.bot_language = detected_language
+                logger.info(f"[CUSTOM] 🌍 Auto-detect: initial language set to {detected_language}")
 
             # Add user message to history
             self.conversation_history.append({
