@@ -116,6 +116,11 @@ class OptimizedStreamHandler:
             "total_latency_ms": []
         }
 
+        # Language tracking for multilingual switching
+        self.bot_language = self.config.get("bot_language", "en")
+        if self.bot_language in ('auto', 'Auto-detect', '', None):
+            self.bot_language = 'en'
+
         # LLM pre-warming state
         self.llm_warmed_up = False
         self.llm_warmup_task: Optional[asyncio.Task] = None
@@ -684,6 +689,32 @@ class OptimizedStreamHandler:
                 if asr_time > 0:
                     self.metrics.setdefault("asr_latency_ms", []).append(asr_time)
                     logger.info(f"[OPTIMIZED] 🎤 Whisper transcription took: {asr_time:.0f}ms")
+
+            # 🌍 Language detection for multilingual switching (English ↔ Hindi)
+            from .custom_provider_stream import detect_language_from_text
+            detected_lang = detect_language_from_text(text)
+            if detected_lang != self.bot_language:
+                logger.info(f"[OPTIMIZED] 🌍 Language switch: {self.bot_language} → {detected_lang}")
+                self.bot_language = detected_lang
+
+                # Update TTS language if supported (Sarvam TTS)
+                if self.tts and hasattr(self.tts, 'language'):
+                    lang_map = {"hi": "hi-IN", "en": "en-IN"}
+                    self.tts.language = lang_map.get(detected_lang, "en-IN")
+                    logger.info(f"[OPTIMIZED] 🌍 TTS language → {self.tts.language}")
+
+                # Update system message to instruct LLM
+                language_names = {"hi": "Hindi", "en": "English"}
+                lang_name = language_names.get(detected_lang, "English")
+                if self.conversation:
+                    messages = self.conversation.get_messages()
+                    if messages and messages[0].get("role") == "system":
+                        base_msg = messages[0]["content"].split("\n\nIMPORTANT: You MUST speak")[0]
+                        if detected_lang != "en":
+                            messages[0]["content"] = f"{base_msg}\n\nIMPORTANT: You MUST speak and respond ONLY in {lang_name}. All your responses should be in {lang_name} language."
+                        else:
+                            messages[0]["content"] = base_msg
+                        logger.info(f"[OPTIMIZED] 🌍 System message updated for {lang_name}")
 
             # Add to conversation history
             self.conversation.add_user_message(text)
