@@ -387,25 +387,30 @@ class CustomProviderHandler:
 
         try:
             import io
-            audio_file = io.BytesIO(audio_data)
-            audio_file.name = "audio.mulaw"
+            import wave
+
+            # Wrap raw PCM in WAV container — Sarvam expects file uploads
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(8000)
+                wf.writeframes(audio_data)
+            wav_bytes = wav_buffer.getvalue()
 
             async with httpx.AsyncClient() as client:
                 files = {
-                    "file": ("audio.mulaw", audio_file, "audio/mulaw")
+                    "file": ("audio.wav", wav_bytes, "audio/wav")
                 }
                 data = {
                     "language_code": self.asr_language,
-                    "model": self.asr_model or "saarika:v1"
+                    "model": self.asr_model or "saarika:v2.5"
                 }
 
                 response = await client.post(
                     "https://api.sarvam.ai/speech-to-text",
                     headers={
                         "api-subscription-key": api_key,
-                        "api-key": api_key,
-                        "x-api-key": api_key,
-                        "Authorization": f"Bearer {api_key}"
                     },
                     files=files,
                     data=data,
@@ -414,9 +419,10 @@ class CustomProviderHandler:
 
                 if response.status_code == 200:
                     result = response.json()
-                    return result.get('transcript', '').strip()
+                    return (result.get('transcript') or result.get('text') or '').strip()
                 else:
-                    logger.error(f"[SARVAM_ASR] Error: {response.status_code}")
+                    error_text = response.text
+                    logger.error(f"[SARVAM_ASR] Error {response.status_code}: {error_text}")
                     return None
         except Exception as e:
             logger.error(f"[SARVAM_ASR] Exception: {e}")

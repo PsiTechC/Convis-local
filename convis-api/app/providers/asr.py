@@ -335,13 +335,30 @@ class SarvamASR(ASRProvider):
     Best for: Hindi, Tamil, Telugu, and other Indian languages
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "saarika:v2", language: str = "hi-IN"):
+    # Map short codes to Sarvam locale codes
+    LANGUAGE_MAP = {
+        "en": "en-IN", "hi": "hi-IN", "bn": "bn-IN", "ta": "ta-IN",
+        "te": "te-IN", "mr": "mr-IN", "gu": "gu-IN", "kn": "kn-IN",
+        "ml": "ml-IN", "pa": "pa-IN", "ur": "ur-IN", "od": "od-IN",
+    }
+
+    def __init__(self, api_key: Optional[str] = None, model: str = "saarika:v2.5", language: str = "hi-IN"):
         super().__init__(
             api_key=api_key or os.getenv("SARVAM_API_KEY"),
             model=model,
             language=language
         )
         self.base_url = "https://api.sarvam.ai"
+
+    def set_language(self, language: str):
+        """Update ASR language for next transcription (called on mid-call language switch)."""
+        old = self.language
+        normalized = self.LANGUAGE_MAP.get(language.lower(), language)
+        # Accept full locale codes as-is (e.g., "hi-IN")
+        if "-" in language and language not in self.LANGUAGE_MAP:
+            normalized = language
+        self.language = normalized
+        self.logger.info(f"[SARVAM_ASR] Language switched: {old} → {self.language}")
 
     async def transcribe_stream(self, audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
         """
@@ -372,9 +389,6 @@ class SarvamASR(ASRProvider):
         try:
             headers = {
                 "api-subscription-key": self.api_key,
-                "api-key": self.api_key,
-                "x-api-key": self.api_key,
-                "Authorization": f"Bearer {self.api_key}",
             }
 
             # Twilio/custom handlers pass raw 8kHz mono PCM. Wrap it in a WAV
@@ -385,12 +399,14 @@ class SarvamASR(ASRProvider):
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(8000)
                 wav_file.writeframes(audio_bytes)
-            wav_buffer.seek(0)
+            wav_bytes = wav_buffer.getvalue()
+
+            self.logger.debug(f"[SARVAM_ASR] WAV size: {len(wav_bytes)} bytes, PCM input: {len(audio_bytes)} bytes")
 
             form = aiohttp.FormData()
             form.add_field(
                 "file",
-                wav_buffer,
+                wav_bytes,
                 filename="audio.wav",
                 content_type="audio/wav",
             )

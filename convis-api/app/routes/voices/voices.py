@@ -1429,6 +1429,33 @@ async def generate_piper_demo(voice_id: str, text: str) -> bytes:
         raise
 
 
+async def generate_xtts_demo(voice_id: str, text: str) -> bytes:
+    """Generate voice demo using local XTTS TTS container"""
+    try:
+        import io
+        import wave
+        from app.services.call_handlers.offline_tts_handler import XttsTTSHandler
+
+        xtts = XttsTTSHandler(voice=voice_id, for_browser=True)
+        pcm_audio = await xtts.synthesize(text)
+
+        if not pcm_audio:
+            raise Exception("XTTS returned empty audio")
+
+        # Convert 24kHz PCM to WAV for browser playback
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(24000)
+            wav_file.writeframes(pcm_audio)
+
+        return wav_buffer.getvalue()
+    except Exception as e:
+        logger.error(f"XTTS demo generation error: {e}")
+        raise
+
+
 def _get_env_provider_key(provider: str) -> Optional[str]:
     """Resolve provider API keys from loaded settings or current environment."""
     provider = provider.lower()
