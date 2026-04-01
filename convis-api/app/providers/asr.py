@@ -342,7 +342,14 @@ class SarvamASR(ASRProvider):
         "ml": "ml-IN", "pa": "pa-IN", "ur": "ur-IN", "od": "od-IN",
     }
 
+    # Force all deprecated models to the latest working version
+    VALID_MODELS = {"saarika:v2.5", "saaras:v3"}
+
     def __init__(self, api_key: Optional[str] = None, model: str = "saarika:v2.5", language: str = "hi-IN"):
+        # Auto-correct deprecated models (v1, v2 → v2.5)
+        if model not in self.VALID_MODELS:
+            logger.warning(f"[SARVAM_ASR] Model '{model}' is deprecated, using 'saarika:v2.5'")
+            model = "saarika:v2.5"
         super().__init__(
             api_key=api_key or os.getenv("SARVAM_API_KEY"),
             model=model,
