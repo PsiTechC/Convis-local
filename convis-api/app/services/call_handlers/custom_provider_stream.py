@@ -1366,11 +1366,13 @@ CURRENT DATE AND TIME CONTEXT (Timezone: {self.timezone_str}):
             # Keep last 10 messages to avoid token limits
             messages = self.conversation_history[-10:]
 
-            # Determine model to use
-            llm_model = self.llm_model
-            if not llm_model:
-                # Default models based on provider
-                llm_model = self._get_default_llm_model()
+            # Disable thinking mode for Qwen3 models (adds huge latency otherwise)
+            llm_model = self.llm_model or self._get_default_llm_model()
+            if "qwen3" in llm_model.lower():
+                messages = list(messages)
+                if messages and messages[0].get("role") == "system":
+                    if not messages[0]["content"].startswith("/no_think"):
+                        messages[0] = {**messages[0], "content": "/no_think\n" + messages[0]["content"]}
 
             # Prepare tools if enabled
             tools = None

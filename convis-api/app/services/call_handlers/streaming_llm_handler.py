@@ -55,9 +55,19 @@ class StreamingLLMHandler:
             Complete response text
         """
         try:
+            # Disable thinking mode for Qwen3 models (adds huge latency otherwise)
+            adjusted_messages = messages
+            if "qwen3" in self.model.lower():
+                adjusted_messages = list(messages)
+                if adjusted_messages and adjusted_messages[0].get("role") == "system":
+                    adjusted_messages[0] = {
+                        **adjusted_messages[0],
+                        "content": "/no_think\n" + adjusted_messages[0]["content"]
+                    }
+
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=adjusted_messages,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 stream=True  # KEY: Enable streaming!
@@ -118,9 +128,19 @@ class StreamingLLMHandler:
         Useful for pipeline architectures.
         """
         try:
+            # Disable thinking mode for Qwen3 models
+            adjusted_messages = messages
+            if "qwen3" in self.model.lower():
+                adjusted_messages = list(messages)
+                if adjusted_messages and adjusted_messages[0].get("role") == "system":
+                    adjusted_messages[0] = {
+                        **adjusted_messages[0],
+                        "content": "/no_think\n" + adjusted_messages[0]["content"]
+                    }
+
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=adjusted_messages,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 stream=True
