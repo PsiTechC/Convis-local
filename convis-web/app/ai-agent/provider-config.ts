@@ -167,9 +167,7 @@ export const ENHANCED_LLM_MODELS = {
     { value: 'llama3.2:1b', label: 'Llama 3.2 (1B) - Ultra Fast', costInput: 0, costOutput: 0, latency: 200, cost: 'Free', speed: 'Ultra Fast' },
     { value: 'llama3.1:8b', label: 'Llama 3.1 (8B) - Balanced', costInput: 0, costOutput: 0, latency: 500, cost: 'Free', speed: 'Moderate' },
     { value: 'mistral', label: 'Mistral (7B) - High Quality', costInput: 0, costOutput: 0, latency: 500, cost: 'Free', speed: 'Moderate' },
-    { value: 'phi3', label: 'Phi-3 (3.8B) - Microsoft Small Model', costInput: 0, costOutput: 0, latency: 350, cost: 'Free', speed: 'Fast' },
-    { value: 'gemma2', label: 'Gemma 2 (9B) - Google', costInput: 0, costOutput: 0, latency: 600, cost: 'Free', speed: 'Moderate' },
-    { value: 'qwen2.5', label: 'Qwen 2.5 (7B) - Alibaba', costInput: 0, costOutput: 0, latency: 500, cost: 'Free', speed: 'Moderate' }
+    { value: 'qwen3:4b', label: 'Qwen 3 (4B) - Alibaba', costInput: 0, costOutput: 0, latency: 400, cost: 'Free', speed: 'Fast' }
   ],
   'openai-realtime': [
     { value: 'gpt-4o-realtime-preview', label: 'GPT-4O Realtime Preview', cost: 0.30, latency: 320, costPerMin: 0.30, speed: 'Realtime' },
@@ -179,6 +177,72 @@ export const ENHANCED_LLM_MODELS = {
     { value: 'gpt-4o-mini-realtime', label: 'GPT-4O Mini Realtime (Stable)', cost: 0.30, latency: 200, costPerMin: 0.30, speed: 'Ultra Fast' }
   ]
 };
+
+export type LLMModelOption = {
+  value: string;
+  label: string;
+  costInput?: number;
+  costOutput?: number;
+  latency: number;
+  cost: string | number;
+  speed: string;
+};
+
+type OllamaModelApiItem = {
+  value?: string;
+  label?: string;
+  size_gb?: number;
+};
+
+const getOllamaSpeed = (sizeGb?: number): string => {
+  if (!sizeGb || sizeGb <= 0) return 'Fast';
+  if (sizeGb <= 2.5) return 'Ultra Fast';
+  if (sizeGb <= 4.5) return 'Fast';
+  if (sizeGb <= 6.0) return 'Moderate';
+  return 'Slow';
+};
+
+const getOllamaLatency = (sizeGb?: number): number => {
+  if (!sizeGb || sizeGb <= 0) return 400;
+  if (sizeGb <= 2.5) return 250;
+  if (sizeGb <= 4.5) return 400;
+  if (sizeGb <= 6.0) return 550;
+  return 700;
+};
+
+export async function fetchOllamaModels(): Promise<LLMModelOption[]> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'https://api.convis.ai'}/api/ollama/models`
+    );
+
+    if (!response.ok) {
+      return ENHANCED_LLM_MODELS.ollama;
+    }
+
+    const data = await response.json();
+    const apiModels = Array.isArray(data?.models) ? data.models as OllamaModelApiItem[] : [];
+
+    if (!apiModels.length) {
+      return ENHANCED_LLM_MODELS.ollama;
+    }
+
+    return apiModels
+      .filter((model) => typeof model.value === 'string' && model.value.trim())
+      .map((model) => ({
+        value: model.value!.trim(),
+        label: model.label?.trim() || model.value!.trim(),
+        costInput: 0,
+        costOutput: 0,
+        latency: getOllamaLatency(model.size_gb),
+        cost: 'Free',
+        speed: getOllamaSpeed(model.size_gb),
+      }));
+  } catch (error) {
+    console.error('Error fetching Ollama models:', error);
+    return ENHANCED_LLM_MODELS.ollama;
+  }
+}
 
 // Twilio Cost
 export const TWILIO_COST_PER_MIN = {

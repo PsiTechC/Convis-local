@@ -14,7 +14,9 @@ import {
   ENHANCED_ASR_MODELS,
   ENHANCED_TTS_MODELS,
   ENHANCED_LLM_MODELS,
-  fetchElevenLabsVoices
+  fetchElevenLabsVoices,
+  fetchOllamaModels,
+  type LLMModelOption
 } from './provider-config';
 
 type SupportedProvider = 'openai' | 'anthropic' | 'azure_openai' | 'google' | 'custom';
@@ -268,7 +270,7 @@ const TTS_VOICES = ENHANCED_TTS_VOICES;
 const TTS_MODELS = ENHANCED_TTS_MODELS;
 
 // LLM Provider Models from provider-config.ts (imported as ENHANCED_LLM_MODELS)
-const LLM_MODELS = ENHANCED_LLM_MODELS;
+const DEFAULT_LLM_MODELS = ENHANCED_LLM_MODELS;
 
 const ASR_LANGUAGES = [
   { value: 'auto', label: 'Auto-detect (Multilingual)' },
@@ -358,6 +360,11 @@ const ASSISTANT_TEMPLATES: AssistantTemplate[] = [
 export default function AIAgentPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const [llmModels, setLlmModels] = useState<{
+    openai: LLMModelOption[];
+    ollama: LLMModelOption[];
+    'openai-realtime': LLMModelOption[];
+  }>(DEFAULT_LLM_MODELS);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [assistants, setAssistants] = useState<AIAssistant[]>([]);
@@ -783,6 +790,44 @@ export default function AIAgentPage() {
       setIsDarkMode(true);
     }
   }, [router, fetchAssistants, fetchApiKeyOptions, fetchCalendarAccounts, fetchWorkflows, fetchPhoneNumbers]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadOllamaModels = async () => {
+      const liveOllamaModels = await fetchOllamaModels();
+      if (!isMounted || !liveOllamaModels.length) {
+        return;
+      }
+
+      setLlmModels((prev) => ({
+        ...prev,
+        ollama: liveOllamaModels,
+      }));
+
+      setFormData((prev) => {
+        if (prev.llm_provider !== 'ollama') {
+          return prev;
+        }
+
+        const currentExists = liveOllamaModels.some((model) => model.value === prev.llm_model);
+        if (currentExists) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          llm_model: liveOllamaModels[0].value,
+        };
+      });
+    };
+
+    loadOllamaModels();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Auto-select API key for custom providers mode (not needed for realtime - uses system key)
@@ -1587,7 +1632,7 @@ export default function AIAgentPage() {
     const llmProvider = assistant.llm_provider || 'openai';
     const llmModel =
       assistant.llm_model ||
-      (LLM_MODELS[llmProvider as keyof typeof LLM_MODELS]?.[0]?.value || 'gpt-4o-mini');
+      (llmModels[llmProvider as keyof typeof llmModels]?.[0]?.value || 'gpt-4o-mini');
     const llmMaxTokens = assistant.llm_max_tokens ?? 150;
 
     // Set provider mode based on stored voice_mode or provider selection
@@ -3215,7 +3260,7 @@ export default function AIAgentPage() {
                                 value={formData.llm_provider}
                                 onChange={(e) => {
                                   const provider = e.target.value as 'openai' | 'ollama';
-                                  const models = LLM_MODELS[provider as keyof typeof LLM_MODELS];
+                                  const models = llmModels[provider as keyof typeof llmModels];
                                   const defaultModel = models?.[0]?.value || 'gpt-4o-mini';
                                   setFormData({
                                     ...formData,
@@ -3239,7 +3284,7 @@ export default function AIAgentPage() {
                                 onChange={handleFormChange}
                                 className={`w-full px-3 py-2 text-sm rounded-lg border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-primary/20`}
                               >
-                                {LLM_MODELS[formData.llm_provider as keyof typeof LLM_MODELS]?.map((model) => (
+                                {llmModels[formData.llm_provider as keyof typeof llmModels]?.map((model) => (
                                   <option key={model.value} value={model.value}>
                                     {model.label}
                                   </option>
@@ -3266,7 +3311,7 @@ export default function AIAgentPage() {
                             <div className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-4">
                                 {(() => {
-                                  const selectedModel = LLM_MODELS[formData.llm_provider as keyof typeof LLM_MODELS]?.find(m => m.value === formData.llm_model);
+                                  const selectedModel = llmModels[formData.llm_provider as keyof typeof llmModels]?.find(m => m.value === formData.llm_model);
                                   const costDisplay = selectedModel?.cost === 'Free' ? 'Free (Local)' : `$${selectedModel?.cost || '0.001'}/1K tokens`;
                                   return (
                                     <>
